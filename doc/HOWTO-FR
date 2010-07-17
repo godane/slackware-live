@@ -1,0 +1,58 @@
+===== Principe de fonctionnement =====
+Pour créer un système vif Slackware, il faut deux systèmes Slackware:
+- le premier, avec les utilitaires Slackware-Live, Unionfs-FUSE et 
+SquashFS-Tools, servira à construire le système vif;
+- le second est le système à transformer en système vif.
+
+Remarque: Il est aussi possible de n'utiliser qu'un seul système 
+(qui se transforme lui même en système vif). Attention, tous les répertoires
+du système sont intégrés au système vif, à l'exception de `/sys', `/proc',
+`/dev' et `/tmp'; penser à démonter les périphériques amovibles par exemple.
+
+
+
+===== Construire le système =====
+Plusieurs solutions sont possibles:
+- effectuer une installation depuis le CD/DVD d'installation de la distribution;
+- installer les paquetages du CD/DVD d'installation dans un répertoire; 
+
+usage: `build-slackware-live.sh --add rep_des_paquetages rep_racine_systeme fichier_liste_paquetages'
+exemple: `build-slackware-live.sh --add /mnt/cdrom /mnt/system  liste_paquetages.txt'
+----------------------------------------
+exemple de fichier `liste_paquetages.txt':
+----------------------------------------
+slackware/a/*
+slackware/n/dhcpcd
+slackware/n/iputils
+slackware/n/net-tools
+slackware/n/network-scripts
+----------------------------------------
+remarque, on peut aussi installer les paquetages avec une commande comme:
+	`installpkg -root /mnt/system /mnt/cdrom/slackware/a/*.t?z'
+
+	
+===== Creation du système vif (compression) =====
+usage: `build-slackware-live.sh --live rep_racine_systemeectory rep_systeme_vif'
+exemple: `build-slackware-live.sh --live /mnt/system /tmp/live'
+
+	
+===== Copie du système vif sur périphérique USB =====
+usage: `build-slackware-live.sh --usb rep_systeme_vif peripherique'
+exemple - après `build-slackware-live.sh --live /mnt/system /tmp/live':
+	`build-slackware-live.sh --usb /tmp/live /dev/sdx1'
+exemple - depuis un système vif en cours d'exécution:
+	`build-slackware-live.sh --usb /live/livemedia /dev/sdx1'
+
+	
+===== Création d'une ISO de CD/DVD de système vif =====
+usage: `build-slackware-live.sh --iso rep_systeme_vif rep_destination_iso'
+exemple - après `build-slackware-live.sh --live /mnt/system /tmp/live':
+	`build-slackware-live.sh --iso /tmp/live /tmp'
+
+	
+===== Installation du système vif =====
+usage: `build-slackware-live.sh --install rep_racine_systeme peripherique_partition'
+exemple - depuis un système vif en cours d'exécution (typiquement):
+	`build-slackware-live.sh --install /live/system /dev/sdx2'
+exemple - clonage d'un système:
+	`build-slackware-live.sh --install /mnt/system /dev/sdx2'

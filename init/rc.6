@@ -1,0 +1,17 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+#load shutdown commands in cache (before umount / CD ejection)
+shutdown --help 2>/dev/null
+poweroff --help 2>/dev/null
+reboot --help 2>/dev/null
+
+umount -a > /dev/null 2>&1
+if [ -f /var/run/slackware-live-media ]; then
+	eject `cat /var/run/slackware-live-media` >/dev/null 2>&1
+fi
+
+if [ "$0" = "/etc/rc.d/rc.0" ]
+then poweroff
+else reboot
+fi

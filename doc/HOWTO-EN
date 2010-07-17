@@ -1,0 +1,12 @@
+To create a live Slackware system, two Slackware systems are needed:
+- the first one, with Slackware-Live, Unionfs-FUSE and SquashFS-Tools 
+will be used to build the live system;
+- the second one is the system to make live.
+
+Remarq: it is possible to have a single system (that transforms itself 
+into a live system). Be carreful: all directories but `/sys', `/proc',
+`/dev' and `/tmp' are included in the live system; think to umount 
+removable devices for example.
+
+To get detailed usage and example of how to build a live system, 
+run `build-slackware-live.sh' without parameters.

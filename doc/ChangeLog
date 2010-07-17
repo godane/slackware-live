@@ -1,0 +1,8 @@
+2010-06-29: Slackware-Live-0.1.6: bugfixes: usb installation (using extlinux instead of syslinux) + autodetects syslinux files location
+2010-06-28: Slackware-Live-0.1.5: bugfixes: font problem + wrong SquashFS module file name for copy ('--usb' option)
+2010-06-25: Slackware-Live-0.1.4: added possibility to use a single system + added better french doc
+2010-06-24: Slackware-Live-0.1.3: added support for non huge kernel
+2010-06-24: Slackware-Live-0.1.2: warning: changed options names for 'build-slackware-live.sh" script
+	+ added more complete (with examples and procedure) inline documentation to 'build-slackware-live.sh" script
+2010-06-21: Slackware-Live-0.1.1: fixed wrong path in 'create_initrd' when installation prefix is not '/usr'
+2010-06-18: Slackware-Live-0.1: forked from LiNomad to be simplier, more versatile, and use UnionFS-FUSE instead of AUFS
