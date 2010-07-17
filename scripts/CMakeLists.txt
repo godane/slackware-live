@@ -1,1 +1,5 @@
 INSTALL (PROGRAMS build-slackware-live.sh DESTINATION sbin PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
+INSTALL (FILES install-slackware-live.sh DESTINATION share/slackware-live)
+INSTALL (FILES init DESTINATION share/slackware-live)
+INSTALL (FILES install-slackware-live.desktop DESTINATION share/slackware-live)
+INSTALL (FILES install-slackware-live.png DESTINATION share/slackware-live)

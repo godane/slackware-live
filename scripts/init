@@ -1,0 +1,201 @@
+#!/bin/ash
+
+#mount points inside /slroot:
+#/live/media: the CD/DVD or USB key (ro) - needed for live system copy
+#/live/modules/*: the squashfs modules (ro)
+#/live/system: the union of all modules (ro) - needed for live system installation
+#/live/union: the union of /slroot/live/changes (rw) and all modules (ro) - the live system
+#/bin, /lib, ... binding (mounts) to /live/union
+
+echo ""
+echo "*** Live system initialization ***"
+mount -v proc /proc -t proc
+mount -v sysfs /sys -t sysfs
+
+/load_kernel_modules 2>/dev/null
+mdev -s
+
+mkdir /tmp #fuse needs /tmp
+SLTITLE=`cat /SLTITLE`
+
+mkdir /slroot
+mount -o defaults -t tmpfs none /slroot #-o defaults: bug in busybox (options=0)
+mkdir /slroot/live
+
+mkdir /slroot/live/media
+cdmediadetected=false
+for device in sr0 sr1; do #seek Slackware-Live on CD/DVD device
+	echo
+	if [ -r /sys/block/$device ] && [ "`cat /sys/block/$device/removable`" == "1" ] && mount /dev/$device /slroot/live/media 2>/dev/null; then
+		if [ -d /slroot/live/media/boot ]; then
+			cdmediadetected=true
+			echo "$SLTITLE found on /dev/$device"
+			break
+		else
+			umount /slroot/live/media
+		fi
+	fi
+done
+
+if ! $cdmediadetected; then #seek Slackware-Live on USB device
+	echo "Waiting for USB device ..."
+	usbmediadetected=false
+	sleeptime=0
+	while ! $usbmediadetected && [ "$sleeptime" != "10" ]; do #try each seconds, but don't wait USB more than 10 seconds
+		sleep 1
+		let sleeptime+=1
+		mdev -s
+		for partition in /sys/block/sd?/sd*; do
+			device=`echo $partition | cut -f4 -d/`
+			partition=`echo $partition | cut -f5 -d/`
+			if [ "`cat /sys/block/$device/removable`" == "1" ] && mount /dev/$partition /slroot/live/media 2>/dev/null; then
+				if [ -d /slroot/live/media/boot ]; then
+					usbmediadetected=true
+					echo "$SLTITLE found on /dev/$partition"
+					break
+				else
+					umount /slroot/live/media
+				fi
+
+			fi
+		done
+	done
+fi
+
+#copy live-media to RAM if requested
+if [ "$copy2ram" == "yes" ]; then
+	echo -n "Copying live system to RAM ..."
+	mkdir /slroot/live/tmp
+	mount --move /slroot/live/media /slroot/live/tmp
+	mount -t tmpfs none /slroot/live/media
+	cp -dpr /slroot/live/tmp/boot /slroot/live/media/
+	umount /slroot/live/tmp
+	rmdir /slroot/live/tmp
+	if $cdmediadetected; then
+		eject /dev/$device
+	fi
+	echo " done"
+fi
+
+#mount all modules in /live/modules/* except excluded ones
+mkdir /slroot/live/modules
+for module in /slroot/live/media/boot/modules/*; do
+	modulename=`basename $module`
+	if ! echo $exclude | sed 's/:/\n/g' | grep -q "^$modulename$"; then #if module is not excluded by bootparam
+		mkdir /slroot/live/modules/$modulename
+		mount -o loop -t squashfs $module /slroot/live/modules/$modulename
+		modulesbranches="/slroot/live/modules/$modulename=ro:$modulesbranches"
+		echo "Loading SquashFS module $modulename"
+	fi
+done
+#load requested optional modules
+for modulename in `echo $include | sed 's/:/ /g'`; do
+	if [ -f /slroot/live/media/boot/optional/$modulename ]; then
+		mkdir /slroot/live/modules/$modulename
+		mount -o loop -t squashfs /slroot/live/media/boot/optional/$modulename /slroot/live/modules/$modulename
+		modulesbranches="/slroot/live/modules/$modulename=ro:$modulesbranches"
+		echo "Loading SquashFS module $modulename"
+	fi
+done
+aufsmodulesbranches=`echo $modulesbranches | sed 's/:$//'`
+unionfsmodulesbranches=`echo $aufsmodulesbranches | sed 's/\/slroot//g'`
+
+#mount (union) all modules in /live/system (ro)
+mkdir /slroot/live/system
+mount -t aufs -o br=$aufsmodulesbranches none /slroot/live/system 2>/dev/null ||
+unionfs -o ro,allow_other,suid,dev,use_ino,cow,max_files=524288,chroot=/slroot $unionfsmodulesbranches /slroot/live/system
+
+#mount (union) all modules (ro) and /live/changes (rw) in /live/union (rw)
+mkdir /slroot/live/changes
+mkdir /slroot/live/union
+mount -t aufs -o br=/slroot/live/changes=rw:$aufsmodulesbranches none /slroot/live/union 2>/dev/null ||
+unionfs -o allow_other,suid,dev,use_ino,cow,max_files=524288,chroot=/slroot /live/changes=rw:$unionfsmodulesbranches /slroot/live/union
+
+#setup system tree
+#bind /live/union top directories into /
+for directory in /slroot/live/union/*; do
+	directoryname=`basename $directory`
+	mkdir /slroot/$directoryname
+	mount --bind $directory /slroot/$directoryname
+done
+mkdir /slroot/tmp
+mkdir /slroot/sys
+mkdir /slroot/proc
+mkdir /slroot/dev
+mknod /slroot/dev/console c 5 1
+mknod /slroot/dev/null c 1 3 #needed to mount /proc (rc.S) on read-only filesystem
+cat > /slroot/etc/fstab << EOF
+proc /proc proc defaults 0 0
+sysfs /sys sysfs defaults 0 0
+tmpfs /dev/shm tmpfs defaults,mode=777 0 0
+none / tmpfs defaults 0 0
+EOF
+echo "none / tmpfs ro 0 0"  > /slroot/etc/mtab
+
+#system startup and shutdown tweaking
+if [ -f /slackware-live/rc.linomad-boot ]; then #LiNomad startup
+	sed -i s/\$device/$device/ /slackware-live/rc.linomad-reboot
+	cp /slackware-live/rc.linomad-* /slroot/etc/rc.d/
+	chmod +x /slroot/etc/rc.d/rc.linomad-*
+	ln -sf rc.linomad-reboot /slroot/etc/rc.d/rc.linomad-halt
+	cp -f /slackware-live/inittab.linomad /slroot/etc/inittab
+	cp /slackware-live/autologin /slroot/usr/bin
+	chmod +x /slroot/usr/bin/autologin
+else #Slackware Live normal startup
+	touch /slroot/etc/fastboot
+	#~ echo "cat /proc/mounts /etc/mtab | sed 's/,relatime//' | sort -u > /etc/mtab" >> /slroot/etc/rc.d/rc.S #update /etc/mtab
+	sed -i 's/\(\/rc.[06]\)/\1 fast/' /slroot/etc/inittab #to prevent system hang at shutdown
+	if $cdmediadetected && [ ! "$copy2ram" == "yes" ]; then #live-CD ejection (reboot, shutdown and poweroff commands are preloaded in cache)
+		sed -i 's/\(\/sbin\/reboot\)/reboot --help; shutdown --help; poweroff --help\n  eject \/dev\/$device\n  \1/' /slroot/etc/rc.d/rc.6
+		sed -i 's/\(\/sbin\/poweroff\)/reboot --help; shutdown --help; poweroff --help\n  eject \/dev\/$device\n  \1/' /slroot/etc/rc.d/rc.6
+		sed -i s/\$device/$device/ /slroot/etc/rc.d/rc.6
+	fi
+	if [ ! -z "$runlevel" ]; then
+		echo "Setting up runlevel $runlevel for startup"
+		sed -i s/id:[1-5]:initdefault:/id:$runlevel:initdefault:/ /slroot/etc/inittab
+	fi
+fi
+
+#system i18n setup
+if [ ! -z "$locale" ]; then
+	echo "Setting up locale ($locale)"
+	echo "export LANG=$locale" > /slroot/etc/profile.d/lang.sh
+fi
+
+if [ ! -z "$keymap" ]; then
+	keymapfile="/`find /slroot/usr/share/kbd/keymaps -name $keymap.map.gz | cut -f3- -d/`"
+	if [ "$keymapfile" != "/" ]; then #if found
+		echo "Setting up keymap ($keymap)"
+		echo "/bin/loadkeys $keymapfile" > /slroot/etc/rc.d/rc.keymap
+		chmod +x /slroot/etc/rc.d/rc.keymap
+	fi
+	
+	if [ -f /slroot/usr/share/hal/fdi/policy/10osvendor/10-keymap.fdi ]; then
+		xkblayout=`echo $keymap | cut -c1-2`
+		echo "Setting up Xorg keymap layout ($xkblayout)"
+		mkdir -p /slroot/etc/hal/fdi/policy/10osvendor/
+		cp /slroot/usr/share/hal/fdi/policy/10osvendor/10-keymap.fdi /slroot/etc/hal/fdi/policy/10osvendor/
+		sed -i s/\>us\</\>$xkblayout\</ /slroot/etc/hal/fdi/policy/10osvendor/10-keymap.fdi
+	fi
+fi
+
+#setup everything needed to install live system
+cp -f /slackware-live/build-slackware-live.sh /slroot/usr/sbin/
+chmod +x /slroot/usr/sbin/build-slackware-live.sh
+if [ -d  /slroot/usr/share/applications && -f /slackware-live/install-slackware-live.desktop ]; then
+	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.desktop
+	cp /slackware-live/install-slackware-live.desktop /slroot/usr/share/applications/
+	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.sh
+	cp /slackware-live/install-slackware-live.sh /slroot/usr/sbin/
+	chmod +x /slroot/usr/sbin/install-slackware-live.sh
+	cp /slackware-live/install-slackware-live.png /slroot/usr/share/pixmaps/
+fi
+
+#chroot to live system
+umount /proc
+umount /sys
+mount -r -o remount /slroot #remount root directory read-only for normal startup
+echo "*** Live system ready ***"
+echo ""
+exec switch_root /slroot /sbin/init
+

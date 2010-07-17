@@ -1,10 +1,11 @@
 Slackware-Live requires the following utilities (and their dependencies) to operate:
-- unionfs-fuse
-- SquashFS module and utility,
-- SysLinux.
+- UnionFS-FUSE or AUFS (if kernel support it),
+- SquashFS-Tools - support LZMA compression if kernel and tools support it,
+- SysLinux,
+- Xdialog (optional).
 
-Attention, Slackware-Live use the CMake construction system. So, the installation
-procedure is:
+Attention, Slackware-Live use the CMake construction system.
+The installation procedure is:
 1) extract the archive containing the program sources,
 2) enter the directory containing the sources,
 3) run the command `cmake .'

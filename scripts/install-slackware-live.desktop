@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+
+Name=Install SLTITLE
+Name[fr]=Installation de SLTITLE
+
+Categories=System
+Exec=install-slackware-live.sh
+Icon=install-slackware-live

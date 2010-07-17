@@ -1,1 +1,14 @@
-Slackware-Live est un utilitaire de construction et d'installation de live CD/DVD/USB écrit pour Slackware Linux.
+Slackware-Live est un utilitaire de construction et d'installation 
+de live CD/DVD/USB écrit pour Slackware Linux:
+- comprends tout le nécessaire pour convertir un système installé 
+en système vif et vice-versa; inclus un programme d'installation graphique;
+- capacité à construire le système à partir de paquetages;
+- il ne nécessite pas la recompilation du noyau;
+- aucune modification n'est nécessaire sur le système à rendre vif;
+- supporte de multiples modules SquashFS;
+- peu s'exécuter depuis la mémoire.
+
+LiNomad est une solution de démarrage personalisée (facultative) offrant les fonctionnalités suivantes:
+- démarrage et arrêt rapide;
+- support du répertoire personnel sur clé USB (système nomade);
+- support de l'auto-détection pour l'interface graphique et ouverture de session automatique;

@@ -1,1 +1,14 @@
-Slackware-Live is a live CD/DVD/USB build and install tool written for Slackware Linux.
+Slackware-Live is a live CD/DVD/USB build and install tool 
+written for Slackware Linux:
+- contains all the necessary to convert an installed system to a 
+live system and vice-versa; includes an installation program with GUI;
+- ability to build a system from packages;
+- it doesn't need any kernel recompile;
+- no changes are needed on the system to make live;
+- support multiple SquashFS modules;
+- can run in RAM.
+
+LiNomad is an customized boot solution (optional) with the following features:
+- fast startup and shutdown;
+- support for home directory on USB (nomad system);
+- support for GUI auto-detection and auto-login.

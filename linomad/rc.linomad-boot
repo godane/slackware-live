@@ -1,0 +1,153 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+#rootfs, proc and sysfs mounting
+mount proc /proc -t proc
+mount sysfs /sys -t sysfs
+mount -w -o remount /
+cat > /etc/mtab << EOF
+none / tmpfs rw 0 0
+proc /proc proc rw 0 0
+sysfs /sys sysfs rw 0 0
+EOF
+
+#usbfs mounting
+mkdir -p /proc/bus/usb; mount usbfs /proc/bus/usb -t usbfs
+
+#udev
+echo "" > /proc/sys/kernel/hotplug
+mount -n -o mode=0755 -t tmpfs tmpfs /dev
+mkdir -p /dev/pts
+mount -n -o mode=0620,gid=5 -t devpts devpts /dev/pts
+cp --preserve=all --recursive --remove-destination /lib/udev/devices/* /dev/
+udevd --daemon
+udevadm trigger && udevadm settle --timeout=120
+chmod 777 /dev/shm; mount /dev/shm
+
+#manual drivers loading
+modprobe agpgart 2>/dev/null
+modprobe psmouse proto=imps 2>/dev/null
+
+#fuse
+modprobe fuse
+mount -t fusectl fusectl /sys/fs/fuse/connections
+
+#system cleanup
+rm -f /var/run/* /var/run/*/* /var/run/*/*/* /var/lock/* /etc/dhcpc/*.pid /var/state/saslauthd/saslauthd.pid 2>/dev/null
+
+#utmp
+touch /var/run/utmp
+chown root:utmp /var/run/utmp
+chmod 664 /var/run/utmp
+
+#configure dynamic linker run-time bindings
+ldconfig
+
+#storage devices detection
+if [ -x /etc/rc.d/rc.detect-storage ]
+then /etc/rc.d/rc.detect-storage start
+fi
+
+#hostname
+hostname $(cat /etc/HOSTNAME | cut -f1 -d .)
+
+#clock
+hwclock --utc --hctosys
+
+#logging
+dmesg -s 65536 > /var/log/dmesg
+syslogd
+klogd -c 3 -x
+
+#filesystem rights
+chmod 755 / 2>/dev/null
+chmod 1777 /tmp /var/tmp
+
+#power management
+acpid 2>/dev/null
+
+#messagebus & hal
+dbus-uuidgen --ensure 2>/dev/null
+dbus-daemon --system >/dev/null 2>/dev/null
+hald --daemon=yes 2>/dev/null
+
+#printing
+cupsd 2>/dev/null
+
+#task scheduling
+crond -l10 >>/var/log/cron 2>&1
+atd -b 15 -l 1
+
+#sound drivers & server
+/etc/rc.d/rc.alsa
+
+#keymap layout
+/etc/rc.d/rc.keymap
+
+echo `uname -s -r ` > /etc/motd
+
+#network
+if [ -x /sbin/sysctl -a -r /etc/sysctl.conf ]; then /sbin/sysctl -e -p /etc/sysctl.conf; fi
+ifconfig lo 127.0.0.1
+dhcpcd eth0 &
+if [ -x /etc/rc.d/rc.firewall ]; then /etc/rc.d/rc.firewall start; fi
+wicd 2>/dev/null 1>&2 &
+
+#mount persistent homedir (live USB only)
+if [ "$usbhome" == "allow" ]; then
+	if [ -d /live/media/home ]; then
+		HOMEDIR="/home/linomad"
+		mount --bind /live/media/home $HOMEDIR
+		if [ -d $HOMEDIR/.mozilla/firefox/linomad.live ]; then #prevent Firefox from writing its cache on USB device
+			mkdir -p $HOMEDIR/.mozilla/firefox/linomad.default/
+			mount -t tmpfs none $HOMEDIR/.mozilla/firefox/linomad.default/
+			cat > $HOMEDIR/.mozilla/firefox/profiles.ini << EOF
+[General]
+StartWithLastProfile=1
+
+[Profile0]
+Name=default
+IsRelative=1
+Path=linomad.default
+EOF
+			for file in places.sqlite signons.sqlite key3.db cert8.db mimeTypes.rdf cookies.sqlite formhistory.sqlite permissions.sqlite content-prefs.sqlite prefs.js; do
+				if [ -f $HOMEDIR/.mozilla/firefox/linomad.live/$file ]; then
+					ln -sf ../linomad.live/$file $HOMEDIR/.mozilla/firefox/linomad.default/
+				fi
+			done
+			mkdir -p $HOMEDIR/.mozilla/firefox/linomad.live/extensions
+			ln -sf $HOMEDIR/.mozilla/firefox/linomad.live/extensions $HOMEDIR/.mozilla/firefox/linomad.default/
+		fi
+	fi
+fi
+
+#GUI setup
+if [ -f /usr/bin/Xorg ]; then
+	mkdir /tmp/.ICE-unix; chmod 1777 /tmp/.ICE-unix
+	mkdir -p /tmp/.X11-unix; chmod 1777 /tmp/.X11-unix
+	#NVidia driver switch / X auto configuration
+	if [ "$gui" == "auto" ]; then
+		if lspci | grep -q GeForce && [ -x /usr/sbin/nvidia-driver-switch.sh ]; then
+			nvidia-driver-switch.sh --nvidia 2>/dev/null
+		else
+			X -configure
+			mv xorg.conf.new /etc/X11/xorg.conf
+		fi
+	fi
+
+	#x auto-start
+	if [ "$gui" != "no" ]; then
+		cat  > /etc/profile.d/x.sh << EOF
+if [ -z "\$DISPLAY" ]; then
+	if [ "\`tty\`" == "/dev/tty1" ]; then
+		startx
+	fi
+fi
+EOF
+		chmod +x /etc/profile.d/x.sh
+	fi
+	
+	#to allow user to change and save settings (usefull for nvidia-settings) 
+	chmod a+w /etc/X11
+	chmod a+w /etc/X11/xorg.conf
+fi

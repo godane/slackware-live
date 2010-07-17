@@ -1,3 +1,24 @@
+2010-07-15: Slackware-Live-0.2.6: more fixes for keymap
+	+ add option to prevent the use of the Slackware-Live installer
+2010-07-13: Slackware-Live-0.2.5: fixed keymap problem
+	+ add '--guiprep' option to prepare the system GUI (fonts, icons) when system is splitted into multiple directories
+2010-07-06: Slackware-Live-0.2.4: use 'gui' and 'usbhome' boot parameters only fo LiNomad startup
+2010-07-05: Slackware-Live-0.2.3: fixes (thanks again to Sebastian Reisse for all the testing and reports)
+	+ enable copyram feature for USB too
+2010-07-04: Slackware-Live-0.2.2: fixed LiNomad to use USB stored home directory
+	+ replaced 'init' boot parameter by 'runlevel'
+	+ add copy to ram feature, to enable live-CD/DVD ejection
+	+ enable support for AUFS (needs kernel recompile) with failback to UnionFS-FUSE
+	+ should be ready for SquashFS with LZMA compression
+2010-07-02: Slackware-Live-0.2.1: fixed documentaton
+	+ add support for non UTF-8 locale
+	+ add support for optional modules include list and exclude modules list (boot parameters)
+	+ add optional support for LiNomad startup (merged to Slackware-Live)
+2010-06-29: Slackware-Live-0.2: support for multiple SquashFS module added (warning: '--live' option removed; '--init' and '--module' options added)
+	+ rc.S and rc.6 have been removed to use standard startup and shutdown
+	+ warning: for '--iso' option, an ISO file name is now expected instead of the destination directory
+	+ added GUI for installation
+
 2010-06-29: Slackware-Live-0.1.6: bugfixes: usb installation (using extlinux instead of syslinux) + autodetects syslinux files location
 2010-06-28: Slackware-Live-0.1.5: bugfixes: font problem + wrong SquashFS module file name for copy ('--usb' option)
 2010-06-25: Slackware-Live-0.1.4: added possibility to use a single system + added better french doc

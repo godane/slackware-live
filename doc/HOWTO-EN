@@ -1,12 +1,68 @@
+===== Operating principle =====
 To create a live Slackware system, two Slackware systems are needed:
 - the first one, with Slackware-Live, Unionfs-FUSE and SquashFS-Tools 
 will be used to build the live system;
-- the second one is the system to make live.
+- the second one is the system to make live; for this system, the utilities 
+Slackware-Live, Unionfs-FUSE and SquashFS-Tools are recommanded.
 
 Remarq: it is possible to have a single system (that transforms itself 
 into a live system). Be carreful: all directories but `/sys', `/proc',
 `/dev' and `/tmp' are included in the live system; think to umount 
 removable devices for example.
 
+
+Once the system to make live has been setup, the conversion needs three commands:
+- `build-slackware-live.sh --init ...' to create the initrd and copy the kernel;
+- `build-slackware-live.sh --module ...' to create a SquashFS module of the system;
+- `build-slackware-live.sh --iso ...' to create an ISO image of the live- system or
+`build-slackware-live.sh --usb ...' to copy it on USB key.
+
+Example:
+- Set up `SLMODLIST' (if not using Slackware stock 'huge' kernel) and `SLTITLE' environment 
+variables: `export SLTITLE="Custom distribution name and version"'
+- `build-slackware-live.sh --init /mnt/system /tmp/live'
+- `build-slackware-live.sh --module /mnt/system /tmp/live 0-slackware-live'
+- `build-slackware-live.sh --iso /tmp/live /tmp/slackware-live.iso'
+
+
 To get detailed usage and example of how to build a live system, 
 run `build-slackware-live.sh' without parameters.
+
+
+
+===== Boot parameters =====
+For the system language and keymap layout, the following boot parameters are available:
+- `locale': system language; example: `locale=fr_FR.UTF-8';
+- `keymap': keymap layout; example: `keymap=fr'; the two first caracters are used for Xorg keymap layout;
+those parameters are predefned (see boot menu).
+
+For modules loading:
+- `include=module1:module2:...': to load selected modules from `/boot/optional' drectory;
+- `exclude=module1:module2:...': to specify the modules not to load;
+example: `exclude=nvidia.sfs'.
+
+Misc:
+- `runlevel=[1-5]': to override default startup runlevel (cf `/etc/inittab')
+- `copy2ram=yes': to ask copy of live system content to memory
+
+
+
+===== Live system files organisation during execution =====
+- The directory `/live/media' is the live media mount point (CD/DVD/USB);
+- the directory `/live/modules' contains the SquashFS modules mount points;
+- the directory `/live/system' is the union of the modules mount points (read-only);
+- the directory `/live/union' is the union of the directory `/live/changes' (write) and of the modules mount points;
+- the directory `/live/changes' contains the modifications done to the live system (copy on write);
+- the directories at root are mount points binded to the directories of `/live/union'.
+
+To add a SquashFS module while the live system is running, mount it in a subdirectory 
+of `/live/modules', then add it to the union `/live/union'; example:
+`mkdir /live/modules/module_name'
+`mount -o loop -t squashfs module_name /live/modules/module_name'
+`unionfs ... ?'
+
+
+===== Conversion of a SquashFS module into a directory =====
+- Mount the module: `mount -o loop -t squashfs the_module mount_point';
+- copy files into an other directory: `cp -dpr mount_point destination_directory';
+- umount the module: `umount mount_point'.

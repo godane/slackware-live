@@ -1,0 +1,5 @@
+INSTALL (FILES rc.linomad-boot DESTINATION share/slackware-live)
+INSTALL (FILES rc.linomad-reboot DESTINATION share/slackware-live)
+INSTALL (FILES inittab.linomad DESTINATION share/slackware-live)
+ADD_EXECUTABLE (autologin autologin.c)
+INSTALL (TARGETS autologin DESTINATION share/slackware-live)
