@@ -23,34 +23,30 @@ mount -o defaults -t tmpfs none /slroot #-o defaults: bug in busybox (options=0)
 mkdir /slroot/live
 
 mkdir /slroot/live/media
-cdmediadetected=false
-for device in sr0 sr1; do #seek Slackware-Live on CD/DVD device
-	echo
-	if [ -r /sys/block/$device ] && [ "`cat /sys/block/$device/removable`" == "1" ] && mount /dev/$device /slroot/live/media 2>/dev/null; then
-		if [ -d /slroot/live/media/boot ]; then
-			cdmediadetected=true
-			echo "$SLTITLE found on /dev/$device"
-			break
-		else
-			umount /slroot/live/media
+mediadetected=false
+detectedmediaiscd=false
+sleeptime=0
+while ! $mediadetected && [ "$sleeptime" != "10" ]; do #try each seconds, but don't wait (USB) more than 10 seconds
+	for device in sr0 sr1; do #seek Slackware-Live on CD/DVD device
+		if [ -r /sys/block/$device ] && [ "`cat /sys/block/$device/removable`" == "1" ] && mount /dev/$device /slroot/live/media 2>/dev/null; then
+			if [ -d /slroot/live/media/boot ]; then
+				mediadetected=true
+				detectedmediaiscd=true
+				echo "$SLTITLE found on /dev/$device"
+				break
+			else
+				umount /slroot/live/media
+			fi
 		fi
-	fi
-done
-
-if ! $cdmediadetected; then #seek Slackware-Live on USB device
-	echo "Waiting for USB device ..."
-	usbmediadetected=false
-	sleeptime=0
-	while ! $usbmediadetected && [ "$sleeptime" != "10" ]; do #try each seconds, but don't wait USB more than 10 seconds
-		sleep 1
-		let sleeptime+=1
-		mdev -s
+	done
+	
+	if ! $mediadetected; then #seek Slackware-Live on USB device
 		for partition in /sys/block/sd?/sd*; do
 			device=`echo $partition | cut -f4 -d/`
 			partition=`echo $partition | cut -f5 -d/`
 			if [ "`cat /sys/block/$device/removable`" == "1" ] && mount /dev/$partition /slroot/live/media 2>/dev/null; then
 				if [ -d /slroot/live/media/boot ]; then
-					usbmediadetected=true
+					mediadetected=true
 					echo "$SLTITLE found on /dev/$partition"
 					break
 				else
@@ -59,7 +55,17 @@ if ! $cdmediadetected; then #seek Slackware-Live on USB device
 
 			fi
 		done
-	done
+	fi
+	if ! $mediadetected; then
+		sleep 1
+		let sleeptime+=1
+		mdev -s
+	fi
+done
+
+if ! $mediadetected; then
+	echo "*** Live system error - live media not detected - exiting ***"
+	exec /bin/ash
 fi
 
 #copy live-media to RAM if requested
@@ -68,14 +74,32 @@ if [ "$copy2ram" == "yes" ]; then
 	mkdir /slroot/live/tmp
 	mount --move /slroot/live/media /slroot/live/tmp
 	mount -t tmpfs none /slroot/live/media
-	cp -dpr /slroot/live/tmp/boot /slroot/live/media/
+	
+	### <modified by Sebastian Reisse for ZenLive>
+	#~ cp -dpr /slroot/live/tmp/boot /slroot/live/media/ #copy everything in the '/boot' directory of the live media
+	mkdir -p /slroot/live/media/boot/modules
+	for module in /slroot/live/tmp/boot/modules/*; do #first copy main non excluded modules
+		modulename=`basename $module`
+		if ! echo $exclude | sed 's/:/\n/g' | grep -q "^$modulename$"; then
+			cp /slroot/live/tmp/boot/modules/$modulename /slroot/live/media/boot/modules/
+		fi
+	done
+	mkdir /slroot/live/media/boot/optional
+	for modulename in `echo $include | sed 's/:/ /g'`; do #then copy included optional modules
+		if [ -f /slroot/live/tmp/boot/optional/$modulename ]; then
+			cp /slroot/live/tmp/boot/optional/$modulename /slroot/live/media/boot/optional/
+		fi
+	done
+	### </modified by Sebastian Reisse for ZenLive>
+	
 	umount /slroot/live/tmp
 	rmdir /slroot/live/tmp
-	if $cdmediadetected; then
+	if $detectedmediaiscd; then
 		eject /dev/$device
 	fi
 	echo " done"
 fi
+
 
 #mount all modules in /live/modules/* except excluded ones
 mkdir /slroot/live/modules
@@ -145,7 +169,7 @@ else #Slackware Live normal startup
 	touch /slroot/etc/fastboot
 	#~ echo "cat /proc/mounts /etc/mtab | sed 's/,relatime//' | sort -u > /etc/mtab" >> /slroot/etc/rc.d/rc.S #update /etc/mtab
 	sed -i 's/\(\/rc.[06]\)/\1 fast/' /slroot/etc/inittab #to prevent system hang at shutdown
-	if $cdmediadetected && [ ! "$copy2ram" == "yes" ]; then #live-CD ejection (reboot, shutdown and poweroff commands are preloaded in cache)
+	if $detectedmediaiscd && [ ! "$copy2ram" == "yes" ]; then #live-CD ejection (reboot, shutdown and poweroff commands are preloaded in cache)
 		sed -i 's/\(\/sbin\/reboot\)/reboot --help; shutdown --help; poweroff --help\n  eject \/dev\/$device\n  \1/' /slroot/etc/rc.d/rc.6
 		sed -i 's/\(\/sbin\/poweroff\)/reboot --help; shutdown --help; poweroff --help\n  eject \/dev\/$device\n  \1/' /slroot/etc/rc.d/rc.6
 		sed -i s/\$device/$device/ /slroot/etc/rc.d/rc.6
@@ -182,7 +206,7 @@ fi
 #setup everything needed to install live system
 cp -f /slackware-live/build-slackware-live.sh /slroot/usr/sbin/
 chmod +x /slroot/usr/sbin/build-slackware-live.sh
-if [ -d  /slroot/usr/share/applications && -f /slackware-live/install-slackware-live.desktop ]; then
+if [ -d  /slroot/usr/share/applications ] && [ -f /slackware-live/install-slackware-live.desktop ]; then
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.desktop
 	cp /slackware-live/install-slackware-live.desktop /slroot/usr/share/applications/
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.sh

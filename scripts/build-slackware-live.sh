@@ -370,17 +370,14 @@ function add_packages() {
 	rootdirectory=$2
 	packageslistfile=$3
 
-	if [ -d "$packagesdirectory/linomad" ] && [ ! -z "$rootdirectory" ] && [ -f "$packageslistfile" ]
-	then mkdir -p $rootdirectory
-		for package in `cat "$packageslistfile" | sed 's/ *#.*//' | sed /=/d`
-		do 	installpkg -root $rootdirectory $packagesdirectory/$package*.t?z || break
-		done
-		for action in `cat "$packageslistfile" | sed 's/^#.*//' | sed -n '/postinstall/p' | cut -f2- -d=`
-		do 	pushd $installationdestination/ >/dev/null
-			eval $action
-			popd >/dev/null
-		done
-	fi
+	for package in `cat "$packageslistfile" | sed 's/ *#.*//' | sed /=/d`
+	do 	installpkg -root $rootdirectory $packagesdirectory/$package*.t?z || break
+	done
+	for action in `cat "$packageslistfile" | sed 's/^#.*//' | sed -n '/postinstall/p' | cut -f2- -d=`
+	do 	pushd $installationdestination/ >/dev/null
+		eval $action
+		popd >/dev/null
+	done
 }
 
 

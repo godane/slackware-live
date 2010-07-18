@@ -1,3 +1,6 @@
+2010-07-17: Slackware-Live-0.2.7: copy2ram: copy only used modules (cf exclude and include boot parameters)
+	+ try to fix USB-CD/DVD booting
+	+ '--add' option bugfix
 2010-07-15: Slackware-Live-0.2.6: more fixes for keymap
 	+ add option to prevent the use of the Slackware-Live installer
 2010-07-13: Slackware-Live-0.2.5: fixed keymap problem
