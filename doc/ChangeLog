@@ -1,3 +1,8 @@
+2010-07-20: Slackware-Live-0.2.8: '-add' option postinstall bugfix
+	+ fixed menu title
+	+ fixed non working AUFS mounting (thanks to Christopher Rogers for reporting)
+	+ fixed non working live system installation GUI menu entry for Linomad
+	+ fixed LiNomad USB home setup
 2010-07-17: Slackware-Live-0.2.7: copy2ram: copy only used modules (cf exclude and include boot parameters)
 	+ try to fix USB-CD/DVD booting
 	+ '--add' option bugfix

@@ -127,11 +127,15 @@ exemple de valeur: "squashfs:fuse:loop:isofs:nls_utf8:ehci-hcd:uhci-hcd:ohci-hcd
 
 
 ===== Parametres de démarrage =====
-Pour la langue du système et la disposition du clavier, les paramètres suivants sont disponibles:
+Pour la langue du système et la disposition du clavier:
 - `locale': la langue du système; exemple: `locale=fr_FR.UTF-8';
 - `keymap': la disposition du clavier; exemple: `keymap=fr'; les deux premiers caractères sont utilisés 
 	pour la disposition du clavier Xorg;
 ces paramètres sont prédéfinis (cf menu de démarrage).
+
+#~ Pour le type d'horloge matérielle et le choix du fuseau horaire:
+#~ - `hwc': type de l'horloge matérielle ('UTC ' ou 'localtime'); exemple: `hwc=UTC';
+#~ - `tz': fuseau horaire ('GMT', 'GMT+?' ou 'GMT-?'); exemple: `tz=GMT+1'.
 
 Pour le chargement des modules:
 - `include=module1:module2:...': pour charger les modules sélectionnés à partir du répertoire `/boot/optional';
@@ -142,7 +146,11 @@ Divers:
 - `runlevel=[1-5]': pour forcer le niveau de démarrage par défaut (cf `/etc/inittab')
 - `copy2ram=yes': pour demander la copie du contenu du système vif en mémoire
 
-
+Pour LiNomad:
+- `usbhome=yes|no': dans le cas d'un système vif sur clé USB, active le stockage du 
+répertoire personnel sur la clé (sinon, il est stocké en RAM);
+- `gui=auto|yes|no': active ou non l'interface graphique avec auto-détection 
+(permet l'activation des pilotes NVidia) ou non.
 
 
 

@@ -2,7 +2,9 @@ Slackware-Live requires the following utilities (and their dependencies) to oper
 - UnionFS-FUSE or AUFS (if kernel support it),
 - SquashFS-Tools - support LZMA compression if kernel and tools support it,
 - SysLinux,
-- Xdialog (optional).
+- Xdialog (optional);
+
+For LiNomad: KTSUSS (optional), SALLU Storage-Detection (optional).
 
 Attention, Slackware-Live use the CMake construction system.
 The installation procedure is:

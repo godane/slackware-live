@@ -31,19 +31,29 @@ run `build-slackware-live.sh' without parameters.
 
 
 ===== Boot parameters =====
-For the system language and keymap layout, the following boot parameters are available:
+For the system language and keymap layout:
 - `locale': system language; example: `locale=fr_FR.UTF-8';
 - `keymap': keymap layout; example: `keymap=fr'; the two first caracters are used for Xorg keymap layout;
 those parameters are predefned (see boot menu).
 
+#~ For hardware clock type and timezone selection:
+#~ - `hwc': hardware clock type ('UTC ' or 'localtime'); example: `hwc=UTC';
+#~ - `tz': timezone ('GMT', 'GMT+?' or 'GMT-?'); example: `tz=GMT+1'.
+
 For modules loading:
 - `include=module1:module2:...': to load selected modules from `/boot/optional' drectory;
-- `exclude=module1:module2:...': to specify the modules not to load;
+- `exclude=module1:module2:...': to specify the modules not to load; 
 example: `exclude=nvidia.sfs'.
 
 Misc:
 - `runlevel=[1-5]': to override default startup runlevel (cf `/etc/inittab')
 - `copy2ram=yes': to ask copy of live system content to memory
+
+For LiNomad:
+- `usbhome=yes|no': in case of live-USB system, activates the home directory storage 
+on USB key (if not, it is stored in RAM);
+- `gui=auto|yes|no': activates or not the GUI, with auto-detection 
+(allows the activation of the NVidia drivers) or not.
 
 
 

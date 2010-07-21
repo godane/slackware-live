@@ -52,7 +52,13 @@ fi
 hostname $(cat /etc/HOSTNAME | cut -f1 -d .)
 
 #clock
-hwclock --utc --hctosys
+if ! grep -q -w rtc /proc/ioports ; then
+	CLOCK_OPT="--directisa"
+fi
+if grep -wq "^UTC" /etc/hardwareclock 2>/dev/null
+then hwclock $CLOCK_OPT --utc --hctosys
+else hwclock $CLOCK_OPT --localtime --hctosys
+fi
 
 #logging
 dmesg -s 65536 > /var/log/dmesg
@@ -94,14 +100,18 @@ if [ -x /etc/rc.d/rc.firewall ]; then /etc/rc.d/rc.firewall start; fi
 wicd 2>/dev/null 1>&2 &
 
 #mount persistent homedir (live USB only)
-if [ "$usbhome" == "allow" ]; then
-	if [ -d /live/media/home ]; then
-		HOMEDIR="/home/linomad"
-		mount --bind /live/media/home $HOMEDIR
-		if [ -d $HOMEDIR/.mozilla/firefox/linomad.live ]; then #prevent Firefox from writing its cache on USB device
-			mkdir -p $HOMEDIR/.mozilla/firefox/linomad.default/
-			mount -t tmpfs none $HOMEDIR/.mozilla/firefox/linomad.default/
-			cat > $HOMEDIR/.mozilla/firefox/profiles.ini << EOF
+if [ "$usbhome" == "yes" ]; then
+	if [ ! -d /live/media/home ]; then #create home directory on USB device
+		mkdir /live/media/home
+		cp -dpr /etc/skel/.??* /live/media/home/
+		chown -R linomad:users /live/media/home
+	fi
+	HOMEDIR="/home/linomad"
+	mount --bind /live/media/home $HOMEDIR
+	if [ -d $HOMEDIR/.mozilla/firefox/linomad.live ]; then #prevent Firefox from writing its cache on USB device
+		mkdir -p $HOMEDIR/.mozilla/firefox/linomad.default/
+		mount -t tmpfs none $HOMEDIR/.mozilla/firefox/linomad.default/
+		cat > $HOMEDIR/.mozilla/firefox/profiles.ini << EOF
 [General]
 StartWithLastProfile=1
 
@@ -110,14 +120,13 @@ Name=default
 IsRelative=1
 Path=linomad.default
 EOF
-			for file in places.sqlite signons.sqlite key3.db cert8.db mimeTypes.rdf cookies.sqlite formhistory.sqlite permissions.sqlite content-prefs.sqlite prefs.js; do
-				if [ -f $HOMEDIR/.mozilla/firefox/linomad.live/$file ]; then
-					ln -sf ../linomad.live/$file $HOMEDIR/.mozilla/firefox/linomad.default/
-				fi
-			done
-			mkdir -p $HOMEDIR/.mozilla/firefox/linomad.live/extensions
-			ln -sf $HOMEDIR/.mozilla/firefox/linomad.live/extensions $HOMEDIR/.mozilla/firefox/linomad.default/
-		fi
+		for file in places.sqlite signons.sqlite key3.db cert8.db mimeTypes.rdf cookies.sqlite formhistory.sqlite permissions.sqlite content-prefs.sqlite prefs.js; do
+			if [ -f $HOMEDIR/.mozilla/firefox/linomad.live/$file ]; then
+				ln -sf ../linomad.live/$file $HOMEDIR/.mozilla/firefox/linomad.default/
+			fi
+		done
+		mkdir -p $HOMEDIR/.mozilla/firefox/linomad.live/extensions
+		ln -sf $HOMEDIR/.mozilla/firefox/linomad.live/extensions $HOMEDIR/.mozilla/firefox/linomad.default/
 	fi
 fi
 
@@ -129,6 +138,9 @@ if [ -f /usr/bin/Xorg ]; then
 	if [ "$gui" == "auto" ]; then
 		if lspci | grep -q GeForce && [ -x /usr/sbin/nvidia-driver-switch.sh ]; then
 			nvidia-driver-switch.sh --nvidia 2>/dev/null
+			#to allow user to change and save settings with nvidia-settings:
+			chmod a+w /etc/X11
+			chmod a+w /etc/X11/xorg.conf
 		else
 			X -configure
 			mv xorg.conf.new /etc/X11/xorg.conf
@@ -146,8 +158,4 @@ fi
 EOF
 		chmod +x /etc/profile.d/x.sh
 	fi
-	
-	#to allow user to change and save settings (usefull for nvidia-settings) 
-	chmod a+w /etc/X11
-	chmod a+w /etc/X11/xorg.conf
 fi

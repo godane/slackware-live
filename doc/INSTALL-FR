@@ -4,6 +4,8 @@ Slackware-Live requiert les utilitaires suivants (et leurs dépendances) pour fo
 - SysLinux,
 - Xdialog (facultatif).
 
+Pour LiNomad: KTSUSS (facultatif), SALLU Storage-Detection (facultatif).
+
 Attention, Slackware-Live utilise le système de construction CMake.
 La procédure d'installation est donc la suivante:
 1) extraire l'archive contenant les sources du programme,

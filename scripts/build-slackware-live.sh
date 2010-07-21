@@ -9,60 +9,60 @@ function create_menu() {
 default menu.c32
 #default vesamenu.c32
 prompt 0
-menu $SLTITLE
+menu title $SLTITLE
 timeout 100
 
-label arabic # العربية
+label arabic # العربية tz=GMT+3
 	menu label Arabic
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=ar_EG.UTF-8 keymap=us $appends
 
 #TODO: Bengali
 
-label chinese # 官话
+label chinese # 官话 tz=GMT+8
 	menu label Chinese
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=zh_cn.UTF-8 keymap=us $appends
 
-label danish # Dansk
+label danish # Dansk tz=GMT+1
 	menu label Danish
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=da_DK.UTF-8 keymap=dk $appends
 
-label english
+label english # tz=GMT-5
 	menu label English
-	menu default
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=en_US.UTF-8 keymap=us $appends
 
-label french # Français
+label french # Français tz=GMT+1
 	menu label French
+	menu default
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=fr_FR.UTF-8 keymap=fr $appends
 	
-label german# Deutsch
+label german # Deutsch tz=GMT+1
 	menu label German
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=de_DE.UTF-8 keymap=de $appends
 	
 #TODO: Hindi
 
-label japan # 日本語
+label japan # 日本語 tz=GMT+9
 	menu label Japan
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=ja_JP.UTF-8 keymap=jp106 $appends
 
-label portuguese # Português
+label portuguese # Português tz=GMT
 	menu label Portuguese
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=pt_PT.UTF-8 keymap=pt $appends
 	
-label russian # русский язык
+label russian # русский язык tz=GMT+3
 	menu label Russian
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=ru_RU.UTF-8 keymap=ru $appends
 	
-label spanish # Español
+label spanish # Español tz=GMT+1
 	menu label Spanish
 	kernel /boot/vmlinuz
 	append initrd=/boot/initrd.gz vga=791 locale=es_ES.UTF-8 keymap=es $appends
@@ -248,6 +248,7 @@ function install_usb() {
 	#~ cp /$syslinuxdir/vesamenu.c32 $livedirectory/boot/extlinux/
 	echo -n "cp -r $livedirectory/boot/modules /mnt/install/boot/ ..."
 	cp -r $livedirectory/boot/modules /mnt/install/boot/
+	echo ""
 	echo -n "cp -r $livedirectory/boot/optional /mnt/install/boot/ ..."
 	cp -r $livedirectory/boot/optional /mnt/install/boot/
 	echo ""
@@ -256,10 +257,7 @@ function install_usb() {
 	cp $livedirectory/boot/initrd.gz /mnt/install/boot/
 	
 	if [ "$option" == "-linomad" ] || [ -f /etc/rc.d/rc.linomad-boot ]
-	then mkdir -p /mnt/install/home
-		cp -dpr $livedirectory/etc/skel/.??* /mnt/install/home/
-		chown -R 1000:users /mnt/install/home
-		create_menu /mnt/install/boot/extlinux/extlinux.conf usbhome=allow gui=auto #usbhome=allow|no
+	then create_menu /mnt/install/boot/extlinux/extlinux.conf usbhome=yes gui=auto #usbhome=yes|no
 	else create_menu /mnt/install/boot/extlinux/extlinux.conf
 	fi
 	
@@ -312,8 +310,7 @@ EOF
 	
 	#lilo begin
 	installdevice=`echo $systempart | cut -c1-8`
-	cp -dpr $installdevice /mnt/install/dev/ #mknod
-	cp -dpr $systempart /mnt/install/dev/
+	cp -dpr $installdevice* /mnt/install/dev/ #mknod
 	cat > /mnt/install/etc/lilo.conf << EOF
 boot = $installdevice
 
@@ -334,9 +331,8 @@ read-only
 
 EOF
 
-	windowspartition=`fdisk -l $installdevice| grep "^$installdevice.*\*" | cut -f1 -d' '`
-	if [ ! -z "$windowspartition" ]
-	then cp -dpr $windowspartition /mnt/install/dev/ 
+	windowspartition=`fdisk -l $installdevice | grep "^$installdevice.*\*" | cut -f1 -d' '`
+	if [ ! -z "$windowspartition" ]; then
 		cat >> /mnt/install/etc/lilo.conf << EOF
 other = $windowspartition
 label = Windows
@@ -348,16 +344,23 @@ EOF
 	chroot /mnt/install lilo
 	chroot /mnt/install umount /proc
 	#lilo end
-	#WARNING: no initrd is created (unneeded with Slackware 'huge' kernel)
+	#NOTE: no initrd is created (unneeded with Slackware 'huge' kernel)
 	
-	cp -f /etc/rc.d/rc.keymap /mnt/install/etc/rc.d/
+	if [ -f /etc/rc.d/rc.keymap ]; then
+		cp -f /etc/rc.d/rc.keymap /mnt/install/etc/rc.d/
+	fi
 	cp -f /etc/profile.d/lang.sh /mnt/install/etc/profile.d/
 	if [ -f /etc/hal/fdi/policy/10osvendor/10-keymap.fdi ]; then
+		mkdir -p /mnt/install/etc/hal/fdi/policy/10osvendor
 		cp -f /etc/hal/fdi/policy/10osvendor/10-keymap.fdi /mnt/install/etc/hal/fdi/policy/10osvendor/
 	fi
 	if [ -f /etc/X11/xorg.conf ]; then
 		cp -f /etc/X11/xorg.conf /mnt/install/etc/X11/
 	fi
+	#~ if [ -f /etc/hardwareclock ]; then
+		#~ cp -f /etc/hardwareclock /mnt/install/etc/
+	#~ fi
+	#~ cp -f /etc/localtime /mnt/install/etc/
 
 	umount /mnt/install
 	rmdir /mnt/install
@@ -373,11 +376,13 @@ function add_packages() {
 	for package in `cat "$packageslistfile" | sed 's/ *#.*//' | sed /=/d`
 	do 	installpkg -root $rootdirectory $packagesdirectory/$package*.t?z || break
 	done
-	for action in `cat "$packageslistfile" | sed 's/^#.*//' | sed -n '/postinstall/p' | cut -f2- -d=`
-	do 	pushd $installationdestination/ >/dev/null
+	
+	IFS=$'\n'; 
+	pushd $rootdirectory >/dev/null
+	for action in `cat "$packageslistfile" | sed 's/^#.*//' | sed -n '/postinstall/p' | cut -f2- -d=`; do
 		eval $action
-		popd >/dev/null
 	done
+	popd >/dev/null
 }
 
 

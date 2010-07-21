@@ -1,1 +1,3 @@
 Add gettext support for install (BASH) script.
+install GUI: allow user to run liloconfig and / or create initrd ?
+Add boot parameter for timezone selection ?

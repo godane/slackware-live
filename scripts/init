@@ -125,8 +125,9 @@ aufsmodulesbranches=`echo $modulesbranches | sed 's/:$//'`
 unionfsmodulesbranches=`echo $aufsmodulesbranches | sed 's/\/slroot//g'`
 
 #mount (union) all modules in /live/system (ro)
+mkdir /slroot/live/.nochanges #workaround because AUFS doesn't allow read-only union
 mkdir /slroot/live/system
-mount -t aufs -o br=$aufsmodulesbranches none /slroot/live/system 2>/dev/null ||
+mount -t aufs -o br=/slroot/live/.nochanges=rw:$aufsmodulesbranches none /slroot/live/system 2>/dev/null ||
 unionfs -o ro,allow_other,suid,dev,use_ino,cow,max_files=524288,chroot=/slroot $unionfsmodulesbranches /slroot/live/system
 
 #mount (union) all modules (ro) and /live/changes (rw) in /live/union (rw)
@@ -158,6 +159,7 @@ echo "none / tmpfs ro 0 0"  > /slroot/etc/mtab
 
 #system startup and shutdown tweaking
 if [ -f /slackware-live/rc.linomad-boot ]; then #LiNomad startup
+	echo "Enabling LiNomad"
 	sed -i s/\$device/$device/ /slackware-live/rc.linomad-reboot
 	cp /slackware-live/rc.linomad-* /slroot/etc/rc.d/
 	chmod +x /slroot/etc/rc.d/rc.linomad-*
@@ -165,6 +167,7 @@ if [ -f /slackware-live/rc.linomad-boot ]; then #LiNomad startup
 	cp -f /slackware-live/inittab.linomad /slroot/etc/inittab
 	cp /slackware-live/autologin /slroot/usr/bin
 	chmod +x /slroot/usr/bin/autologin
+	sed -i 's/^Exec=.*/Exec=ktsuss \/usr\/sbin\/install-slackware-live.sh/' /slackware-live/install-slackware-live.desktop
 else #Slackware Live normal startup
 	touch /slroot/etc/fastboot
 	#~ echo "cat /proc/mounts /etc/mtab | sed 's/,relatime//' | sort -u > /etc/mtab" >> /slroot/etc/rc.d/rc.S #update /etc/mtab
@@ -175,7 +178,7 @@ else #Slackware Live normal startup
 		sed -i s/\$device/$device/ /slroot/etc/rc.d/rc.6
 	fi
 	if [ ! -z "$runlevel" ]; then
-		echo "Setting up runlevel $runlevel for startup"
+		echo "Setting up runlevel ($runlevel)"
 		sed -i s/id:[1-5]:initdefault:/id:$runlevel:initdefault:/ /slroot/etc/inittab
 	fi
 fi
@@ -202,11 +205,20 @@ if [ ! -z "$keymap" ]; then
 		sed -i s/\>us\</\>$xkblayout\</ /slroot/etc/hal/fdi/policy/10osvendor/10-keymap.fdi
 	fi
 fi
+#~ if [ ! -z "$hwc" ]; then
+	#~ echo "Setting up hardware clock type ($hwc)"
+	#~ echo "$hwc" > /slroot/etc/hardwareclock
+#~ fi
+#~ if [ ! -z "$tz" ]; then
+	#~ echo "Setting up timezone ($tz)"
+	#~ cat /slroot/usr/share/zoneinfo/Etc/$tz > /slroot/etc/localtime
+#~ fi
 
 #setup everything needed to install live system
 cp -f /slackware-live/build-slackware-live.sh /slroot/usr/sbin/
 chmod +x /slroot/usr/sbin/build-slackware-live.sh
 if [ -d  /slroot/usr/share/applications ] && [ -f /slackware-live/install-slackware-live.desktop ]; then
+	echo "Enable live system install GUI"
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.desktop
 	cp /slackware-live/install-slackware-live.desktop /slroot/usr/share/applications/
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.sh
