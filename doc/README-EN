@@ -3,12 +3,13 @@ written for Slackware Linux:
 - contains all the necessary to convert an installed system to a 
 live system and vice-versa; includes an installation program with GUI;
 - ability to build a system from packages;
-- it doesn't need any kernel recompile;
+- it doesn't need any kernel recompile, but it support seamlessly AUFS and 
+SquashFS-LZMA if your kernel support them;
 - no changes are needed on the system to make live;
 - support multiple SquashFS modules;
 - can run in RAM.
 
-LiNomad is an customized boot solution (optional) with the following features:
-- fast startup and shutdown;
+LiNomad (include but optional) is a customized boot solution with the following features:
+- fast startup optimized for desktop use;
 - support for home directory on USB (nomad system);
 - support for GUI auto-detection and auto-login.

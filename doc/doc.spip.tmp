@@ -1,0 +1,5 @@
+===== Boot parameters =====
+{3{Hardware clock type and timezone selection}3}
+-* ¤hwc¤: hardware clock type (¤UTC ¤ or ¤localtime¤); example: ¤hwc=UTC¤
+-* ¤tz¤: timezone (¤GMT¤, ¤GMT+?¤ or ¤GMT-?¤); example: ¤tz=GMT+1¤
+

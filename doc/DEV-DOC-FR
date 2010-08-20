@@ -1,0 +1,20 @@
+===== Organisation des fichiers du système vif en cours d'exécution =====
+- Le répertoire `/live/media' est le point de montage du media vif (CD/DVD/USB);
+- le répertoire `/live/modules' contient les points de montage des differents modules SquashFS;
+- le répertoire `/live/system' est l'union des points de montage des modules (lecture seule);
+- le répertoire `/live/union' est l'union du répertoire `/live/changes' (écriture) et des points de montage des modules;
+- le répertoire `/live/changes' contient les modifications apportées au système vif (copie sur écriture);
+- les répertoires à la racine sont des points de montages liés aux répertoires de `/live/union'.
+
+Pour ajouter un module SquashFS alors que le système vif est en cours d'exécution, 
+il faut le monter dans un sous-répertoire de `/live/modules', puis l'ajouter à 
+l'union `/live/union'; exemple:
+`mkdir /live/modules/nom_module'
+`mount -o loop -t squashfs module_name /live/modules/nom_module'
+`unionfs ... ?'
+
+
+===== Conversion d'un module en répertoire =====
+- Monter le module SquashFS: `mount -o loop -t squashfs le_module point_de_montage';
+- copier les fichiers dans un autre répertoire: `cp -dpr point_de_montage repertoire_destination';
+- démonter le module: `umount point_de_montage'.

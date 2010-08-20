@@ -1,15 +1,13 @@
 ===== Principe de fonctionnement =====
 Pour créer un système vif Slackware, il faut deux systèmes Slackware:
-- le premier, avec les utilitaires Slackware-Live, Unionfs-FUSE et 
+- le premier, avec les utilitaires Syslinux, Slackware-Live, Unionfs-FUSE et 
 SquashFS-Tools, servira à construire le système vif;
-- le second est le système à transformer en système vif; pour ce système, 
-les utilitaires Slackware-Live, Unionfs-FUSE et SquashFS-Tools sont recommandés.
-
-Remarque: Il est aussi possible de n'utiliser qu'un seul système 
-(qui se transforme lui même en système vif). Attention, tous les répertoires
-du système sont intégrés au système vif, à l'exception de `/sys', `/proc',
-`/dev' et `/tmp'; penser à démonter les périphériques amovibles par exemple.
-
+- le second est le système à transformer en système vif; ce système doit
+avoir un noyau (le noyau 'huge SMP' fournit par Slackware est recommandé),
+des modules et l'utilitaire MkInitRD; les utilitaires SysLinux et/ou LiLo sont 
+nécessaires pour que le système vif puisse être copié sur une clé USB ou
+installé sur une partition d'un disque (respectivement). KTSUSS et Xdialog
+sont nécessaires pour le programme d'installation graphique.
 
 Une fois paramétré le système à rendre vif, la conversion s'effectue en trois commandes:
 - `build-slackware-live.sh --ini ...' pour créer un initrd et copier le noyau;
@@ -18,11 +16,32 @@ Une fois paramétré le système à rendre vif, la conversion s'effectue en troi
 `build-slackware-live.sh --usb ...' pour le copier sur clé USB.
 
 Exemple:
-- Définir les variables d'environnement `SLMODLIST' (si le noyau utilisé n'est pas le 'huge' 
-livré avec Slackware) et `SLTITLE': `export SLTITLE="Nom et version personalisés"'
-- `build-slackware-live.sh --init /mnt/system /tmp/live'
-- `build-slackware-live.sh --module /mnt/system /tmp/live 0-slackware-live'
-- `build-slackware-live.sh --iso /tmp/live /tmp/slackware-live.iso'
+- Paramétrer le système:
+	- A partir d'un système Slackware Linux — le système de construction —, 
+	installer les paquetages voulus à l'intérieur du répertoire `/mnt/system' 
+	— racine du système vif —:
+	`installpkg -root /mnt/system /mnt/cdrom/slackware/a/*.t?z'
+	- Ajouter un utilisateur (si nécessaire):
+	`chroot /mnt/system #système vif'
+	`useradd -m -g users -s /bin/bash liveuser'
+	`usermod -G floppy,cdrom,netdev,plugdev,scanner,lp,audio,video,power liveuser'
+	`passwd liveuser'
+	`exit #chroot'
+- Construire le système vif:
+`export SLTITLE="Nom et version personalisés"'
+`build-slackware-live.sh --init /mnt/system /tmp/live'
+`build-slackware-live.sh --module /mnt/system /tmp/live 0-slackware-live'
+`build-slackware-live.sh --iso /tmp/live /tmp/slackware-live.iso'
+
+Remarques:
+- Les systèmes de construction et vifs ne doivent pas obligatoirement
+être de la même version Slackware.
+- Il est aussi possible de n'utiliser qu'un seul système (qui se transforme lui 
+même en système vif). Simplement utiliser `/' pour le paramètre indiquant
+le répertoire racine du système (`/mnt/system' pour les exemples ci dessus).
+Attention, tous les répertoires du système sont intégrés au système vif, 
+à l'exception de `/sys', `/proc', `/dev' et `/tmp'; penser à démonter les 
+périphériques amovibles par exemple.
 
 
 ===== Construire le système =====
@@ -47,11 +66,16 @@ postinstall=...
 Remarques:
 - on peut aussi installer les paquetages avec une commande comme:
 	`installpkg -root /mnt/system /mnt/cdrom/slackware/a/*.t?z';
-- les paquetages `slackware-live', `unionfs-fuse' et `squashfs-tools' 
-sont recommandés sur le système vif.
 - penser à créer un utilisateur, avec les commandes suivantes par exemple:
-`chroot /mnt/system useradd -m -G floppy,cdrom,netdev,plugdev,scanner,lp,audio,video,power -s /bin/bash liveuser'
+`chroot /mnt/system useradd -m -g users -G floppy,cdrom,netdev,plugdev,scanner,lp,audio,video,power -s /bin/bash liveuser'
 `sed -i 's/liveuser:.:/liveuser::/' /mnt/system/etc/shadow' #pas de mot de passe
+
+
+===== Preparation de l'interface graphique du système (polices, icones ...) =====
+usage: `build-slackware-live.sh --guiprep rep_racine_systeme_1(en écriture) rep_racine_systeme_2(en lecture seule) ...'
+	(lister les répertoires racines nécessaires pour recomposer un système fonctionnel; seul le premier est modifiable)
+exemple: `build-slackware-live.sh --guiprep /mnt/system-core /mnt/system-gui'
+remarque: n'est nécessaire que si le système est découpé en de multiples répertoires
 
 
 ===== Configuration du noyau et de l'initrd =====
@@ -65,17 +89,10 @@ ils doivent être intégrés au noyau où à l'initrd (s'ils sont sous la forme 
 voir la variable d'environement `SLMODLIST'
 
 
-===== Preparation de l'interface graphique du système (polices, icones ...) =====
-usage: `build-slackware-live.sh --guiprep rep_racine_systeme_1(en écriture) rep_racine_systeme_2(en lecture seule) ...'
-	(lister les répertoires racines nécessaires pour recomposer un système fonctionnel)
-exemple: `build-slackware-live.sh --guiprep /mnt/system-core /mnt/system-gui'
-remarque: n'est nécessaire que si le système est découpé en de multiples répertoires
-
-	
-
 ===== Creation d'un module SquashFS pour le système =====
 usage: `build-slackware-live.sh --module rep_racine_systeme rep_systeme_vif nom_module [-optional]'
-	(`-optional': module optionel)
+	(le nom du module est aussi le nom du fichier SquashFS)
+	(avec l'option `-optional',  le module est créé dans le répertoire `optional')
 exemple: `build-slackware-live.sh --module /mnt/system /tmp/live slackware-live'
 remarque: vous pouvez placer vos propres modules dans le répertoire `rep_systeme_vif/boot/modules/'
 ou `rep_systeme_vif/boot/optional/', ou les déplacer entre `modules' et `optional'.
@@ -83,8 +100,8 @@ ou `rep_systeme_vif/boot/optional/', ou les déplacer entre `modules' et `option
 	
 ===== Copie du système vif sur périphérique USB =====
 usage: `build-slackware-live.sh --usb rep_systeme_vif peripherique [-linomad]'
-	(l'option `-linomad' crée et activve le répertoire personnel stocké sur la clé USB
-	ainsi que l'auto-detection pour linterface graphique de LiNomad)
+	(l'option `-linomad' active le répertoire personnel stocké sur la clé USB
+	ainsi que l'auto-detection de linterface graphique les scripts de démarrage LiNomad)
 exemple - après initialisation et création du ou des modules:
 	`build-slackware-live.sh --usb /tmp/live /dev/sdx1'
 exemple - depuis un système vif en cours d'exécution:
@@ -93,18 +110,27 @@ exemple - depuis un système vif en cours d'exécution:
 	
 ===== Création d'une ISO de CD/DVD de système vif =====
 usage: `build-slackware-live.sh --iso rep_systeme_vif nom_fichier_iso [-linomad]'
-	(l'option `-linomad' active l'auto-detection pour linterface graphique de LiNomad)
+	(l'option `-linomad' active l'auto-detection de linterface graphique pour les
+	les scripts de démarrage LiNomad)
 exemple - après initialisation et création du ou des modules:
 	`build-slackware-live.sh --iso /tmp/live /tmp/slackware-live.iso'
 
 	
 ===== Installation du système vif =====
-usage: `build-slackware-live.sh --install rep_racine_systeme peripherique_partition'
+usage: `build-slackware-live.sh --install rep_racine_systeme peripherique_partition [-auto|-expert]'
+	(l'option `-auto' active l'installation de LiLo dans le MBR)
+	(avec l'option `-expert', LiLo n'est pas installé - voir mode expert)
 exemple - depuis un système vif en cours d'exécution (typiquement):
-	`build-slackware-live.sh --install /live/system /dev/sdx2'
+	`build-slackware-live.sh --install /live/system /dev/sdx2 -auto'
 exemple - clonage d'un système:
 	`build-slackware-live.sh --install /mnt/system /dev/sdx2'
 
+
+===== Installation de LiLo en mode expert ====="
+usage: `build-slackware-live.sh --loadersetup peripherique_partition'
+example - après l'installation du système:
+	`build-slackware-live.sh --loadersetup /dev/sdx2'
+	
 
 ===== Variables d'environnement =====
 Les options par défaut permettent la construction d'un système 
@@ -123,28 +149,26 @@ valeur par défaut: "squashfs:fuse" (pour noyau Slackware 'huge' standard)
 exemple de valeur: "squashfs:fuse:loop:isofs:nls_utf8:ehci-hcd:uhci-hcd:ohci-hcd:usb-storage"
 
 
-
-
-
 ===== Parametres de démarrage =====
 Pour la langue du système et la disposition du clavier:
 - `locale': la langue du système; exemple: `locale=fr_FR.UTF-8';
 - `keymap': la disposition du clavier; exemple: `keymap=fr'; les deux premiers caractères sont utilisés 
-	pour la disposition du clavier Xorg;
-ces paramètres sont prédéfinis (cf menu de démarrage).
+	pour la disposition du clavier Xorg.
 
 #~ Pour le type d'horloge matérielle et le choix du fuseau horaire:
 #~ - `hwc': type de l'horloge matérielle ('UTC ' ou 'localtime'); exemple: `hwc=UTC';
 #~ - `tz': fuseau horaire ('GMT', 'GMT+?' ou 'GMT-?'); exemple: `tz=GMT+1'.
 
 Pour le chargement des modules:
-- `include=module1:module2:...': pour charger les modules sélectionnés à partir du répertoire `/boot/optional';
-- `exclude=module1:module2:...': pour spécifier des modules qui ne doivent pas être chargés;
-exemple: `exclude=nvidia.sfs'.
+- `include=module1:module2:...': pour charger les modules sélectionnés à partir du 
+répertoire `/boot/optional' (le nom des modules est celui des fichiers SquashFS);
+- `exclude=module1:module2:...': pour spécifier les modules principaux (du répertoire 
+`/boot/modules') qui ne doivent pas être chargés; exemple: `exclude=1-gui'.
 
 Divers:
-- `runlevel=[1-5]': pour forcer le niveau de démarrage par défaut (cf `/etc/inittab')
+- `runlevel=[1-5]': pour forcer le niveau de démarrage par défaut (cf `/etc/inittab');
 - `copy2ram=yes': pour demander la copie du contenu du système vif en mémoire
+(permet de le retirer).
 
 Pour LiNomad:
 - `usbhome=yes|no': dans le cas d'un système vif sur clé USB, active le stockage du 
@@ -152,25 +176,3 @@ répertoire personnel sur la clé (sinon, il est stocké en RAM);
 - `gui=auto|yes|no': active ou non l'interface graphique avec auto-détection 
 (permet l'activation des pilotes NVidia) ou non.
 
-
-
-===== Organisation des fichiers du système vif en cours d'exécution =====
-- Le répertoire `/live/media' est le point de montage du media vif (CD/DVD/USB);
-- le répertoire `/live/modules' contient les points de montage des differents modules SquashFS;
-- le répertoire `/live/system' est l'union des points de montage des modules (lecture seule);
-- le répertoire `/live/union' est l'union du répertoire `/live/changes' (écriture) et des points de montage des modules;
-- le répertoire `/live/changes' contient les modifications apportées au système vif (copie sur écriture);
-- les répertoires à la racine sont des points de montages liés aux répertoires de `/live/union'.
-
-Pour ajouter un module SquashFS alors que le système vif est en cours d'exécution, 
-il faut le monter dans un sous-répertoire de `/live/modules', puis l'ajouter à 
-l'union `/live/union'; exemple:
-`mkdir /live/modules/nom_module'
-`mount -o loop -t squashfs module_name /live/modules/nom_module'
-`unionfs ... ?'
-
-
-===== Conversion d'un module en répertoire =====
-- Monter le module SquashFS: `mount -o loop -t squashfs le_module point_de_montage';
-- copier les fichiers dans un autre répertoire: `cp -dpr point_de_montage repertoire_destination';
-- démonter le module: `umount point_de_montage'.

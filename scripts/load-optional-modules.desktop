@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Terminal=false
+
+Name=Load optional modules
+Name[fr]=Charger des modules optionnels
+Comment=loads optional modules into live system
+
+Categories=Application;System;Settings;
+StartupNotify=true
+Exec=ktsuss load-optional-modules.sh
+Icon=load-optional-modules

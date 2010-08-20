@@ -7,6 +7,7 @@ function create_menu() {
 	
 	cat > $menufile << EOF
 default menu.c32
+#ui menu.c32 ~
 #default vesamenu.c32
 prompt 0
 menu title $SLTITLE
@@ -169,8 +170,13 @@ function create_initrd() {
 		cp $initscriptbasepath/share/slackware-live/install-slackware-live.* $rootdirectory/tmp/initrd-tree/slackware-live/
 	fi
 	
+	#~ #put in initrd everything needed to load optional modules
+	#~ cp $initscriptbasepath/share/slackware-live/manage-optional-modules.sh $rootdirectory/tmp/initrd-tree/slackware-live/
+	#~ if [ "$option" != "-nosli" ]; then
+		#~ cp $initscriptbasepath/share/slackware-live/load-optional-modules.* $rootdirectory/tmp/initrd-tree/slackware-live/
+	#~ fi
+
 	if [ "$option" == "-linomad" ]; then #if LiNomad startup is requested
-		echo "Using LiNomad startup scripts"
 		cp $initscriptbasepath/share/slackware-live/rc.linomad-* $rootdirectory/tmp/initrd-tree/slackware-live/
 		cp $initscriptbasepath/share/slackware-live/inittab.linomad $rootdirectory/tmp/initrd-tree/slackware-live/
 		cp $initscriptbasepath/share/slackware-live/autologin $rootdirectory/tmp/initrd-tree/slackware-live/
@@ -282,8 +288,10 @@ function init_live() {
 function install_system() {
 	rootdirectory=$1
 	systempart=$2
+	loadersetup=$3
 
-	mkfs.ext4 $systempart
+	SYSINSTALLFS="ext4"
+	mkfs.$SYSINSTALLFS $systempart
 
 	mkdir -p /mnt/install
 	mount $systempart /mnt/install
@@ -294,7 +302,7 @@ function install_system() {
 		echo ""
 	done
 	
-	mkdir /mnt/install/{dev,proc,sys,tmp}
+	mkdir -p /mnt/install/{dev,proc,sys,tmp} #-p shouldn't be needed
 	cp -dpr $rootdirectory/lib/udev/devices/* /mnt/install/dev/
 
 	umount /mnt/install #syncing
@@ -304,20 +312,52 @@ function install_system() {
 proc /proc proc defaults 0 0
 sysfs /sys sysfs defaults 0 0
 tmpfs /dev/shm tmpfs defaults,mode=777 0 0
-$systempart / ext4 defaults 1 1
+$systempart / $SYSINSTALLFS defaults 1 1
 EOF
-	echo "$systempart / ext4 defaults 1 1" > /mnt/install/etc/mtab
+	echo "$systempart / $SYSINSTALLFS defaults 1 1" > /mnt/install/etc/mtab
+	
+	#initrd begin
+	if [ ! -f /mnt/install/boot/initrd.gz ]; then
+		kv=`basename /mnt/install/lib/modules/*`
+		if lsmod | grep -q $SYSINSTALLFS; then
+			modulelist="$SYSINSTALLFS"
+		fi
+		for module in `lsmod | sed 1d | cut -f1 -d' '`; do 
+			modulebis=`echo $module | sed 's/_/-/g'` #'_' -> '-'
+			if [ -f /lib/modules/$kv/kernel/drivers/ata/$module.ko ] || [ -f /lib/modules/$kv/kernel/drivers/scsi/$module.ko ]; then
+				modulelist="$module:$modulelist"
+			fi
+			if [ "$module" != "$modulebis" ]; then
+				if [ -f /lib/modules/$kv/kernel/drivers/ata/$modulebis.ko ] || [ -f /lib/modules/$kv/kernel/drivers/scsi/$modulebis.ko ]; then
+					modulelist="$modulebis:$modulelist"
+				fi
+			fi
+		done
+		modulelist=`echo $modulelist | sed 's/:$//'`
+		if [ ! -z "$modulelist" ]; then
+			chroot /mnt/install mount /proc
+			chroot /mnt/install mkinitrd -c -f $SYSINSTALLFS -r $systempart -k $kv -m $modulelist
+			chroot /mnt/install umount /proc
+		fi
+	fi
+	#initrd end
 	
 	#lilo begin
-	installdevice=`echo $systempart | cut -c1-8`
-	cp -dpr $installdevice* /mnt/install/dev/ #mknod
-	cat > /mnt/install/etc/lilo.conf << EOF
-boot = $installdevice
+	if [ "$loadersetup" == "-auto" ]; then
+		installdevice=`echo $systempart | cut -c1-8`
+		cp -dpr /dev/sd* /mnt/install/dev/ #create disk nodes needed for LiLo
+		echo "boot = $installdevice" > /mnt/install/etc/lilo.conf
+		if [ -f /mnt/install/boot/slack.bmp ]; then
+			cat >> /mnt/install/etc/lilo.conf << EOF
 
 bitmap = /boot/slack.bmp
 bmp-colors = 255,0,255,0,255,0
 bmp-table = 60,6,1,16
 bmp-timer = 65,27,0,255
+
+EOF
+		fi
+		cat >> /mnt/install/etc/lilo.conf << EOF
 vga = 791
 lba32
 
@@ -328,23 +368,25 @@ image = /boot/vmlinuz
 root = $systempart
 label = Linux
 read-only
-
 EOF
+		if [ -f /mnt/install/boot/initrd.gz ]; then
+			echo "initrd = /boot/initrd.gz" >> /mnt/install/etc/lilo.conf
+		fi
+		windowspartition=`fdisk -l $installdevice | grep "^$installdevice.*\*.*NTFS$" | cut -f1 -d' '`
+		if [ ! -z "$windowspartition" ]; then
+			cat >> /mnt/install/etc/lilo.conf << EOF
 
-	windowspartition=`fdisk -l $installdevice | grep "^$installdevice.*\*" | cut -f1 -d' '`
-	if [ ! -z "$windowspartition" ]; then
-		cat >> /mnt/install/etc/lilo.conf << EOF
 other = $windowspartition
 label = Windows
 table = $installdevice
 EOF
+		fi
+		chroot /mnt/install mount /proc
+		chroot /mnt/install lilo
+		chroot /mnt/install umount /proc
+	else echo -e "\nTo setup LiLo after installation, You can run the following command:\n\t`basename $0` --loadersetup $systempart\n"
 	fi
-	
-	chroot /mnt/install mount /proc
-	chroot /mnt/install lilo
-	chroot /mnt/install umount /proc
 	#lilo end
-	#NOTE: no initrd is created (unneeded with Slackware 'huge' kernel)
 	
 	if [ -f /etc/rc.d/rc.keymap ]; then
 		cp -f /etc/rc.d/rc.keymap /mnt/install/etc/rc.d/
@@ -368,6 +410,19 @@ EOF
 }
 
 
+function loadersetup() {
+	systempart=$1
+	
+	mkdir /mnt/install
+	mount $systempart /mnt/install
+	chroot /mnt/install mount /proc
+	chroot /mnt/install liloconfig
+	chroot /mnt/install umount /proc
+	umount /mnt/install
+	rmdir /mnt/install
+}
+
+
 function add_packages() {
 	packagesdirectory=$1
 	rootdirectory=$2
@@ -386,11 +441,94 @@ function add_packages() {
 }
 
 
+#~ function share_live() {
+	#~ livedirectory=$1
+	#~ listeniface=$2
+	#~ iprange=$3
+	#~ option=$4
+	
+	#~ #backups
+	#~ if [ ! -f /etc/export.sl ]; then mv /etc/exports{,.sl}; fi
+	#~ if [ ! -f /etc/dhcpd.conf.sl ]; then mv /etc/dhcpd.conf{,.sl}; fi
+	
+	#~ #retrieve network parameters
+	#~ serverip=`ifconfig $listeniface | sed -n 2p | cut -f2 -d: | cut -f1 -d' '`
+	#~ netmask=`ifconfig $listeniface | sed -n 2p | cut -f4 -d:`
+	#~ gateway=`route -n | sed  -n /^0.0.0.0/p | sed s/\ \ */:/g | cut -f2 -d:`
+	#~ nameserver=`cat /etc/resolv.conf | grep nameserver | sed -n 1p | cut -f2 -d' '`
+	#~ if [ "$gateway" == "0.0.0.0" ]; then
+		#~ gateway=$serverip
+		#~ nameserver=$serverip
+	#~ fi
+	#~ network=`ifconfig $listeniface | sed -n 2p | cut -f3 -d: | cut -f1 -d' ' | sed s/255/0/g`
+	
+	#~ #setup NFS server
+	#~ mkdir /export
+	#~ mkdir -p /export$livedirectory
+	#~ mount --bind $livedirectory /export$livedirectory
+	#~ #mkdir -p /export/home
+	#~ #mount --bind /home /export/home
+	#~ cat > /etc/exports << EOF
+#~ /export $network/$netmask(ro,no_root_squash,no_all_squash,async,no_subtree_check,fsid=0)
+#~ /export$livedirectory $network/$netmask(ro,no_root_squash,no_all_squash,async,no_subtree_check)
+#~ #/export/home $network/$netmask(rw,no_root_squash,no_all_squash,async,no_subtree_check) #fsid=1
+#~ EOF
+	#~ . /etc/rc.d/rc.nfsd start
+	
+	#~ #setup TFTP booting
+	#~ mkdir -p /tftpboot
+	#~ cp  /boot/vmlinuz /tftpboot/
+	#~ syslinuxdir=$(dirname $(grep isolinux.bin /var/log/packages/syslinux*))
+	#~ cp /$syslinuxdir/pxelinux.0 /tftpboot/
+	#~ mkdir /tftpboot/pxelinux.cfg
+	#~ if [ "$option" == "-linomad" ]
+	#~ then create_menu /tftpboot/pxelinux.cfg/default gui=auto nfsroot=$serverip:/export$livedirectory
+	#~ else create_menu /tftpboot/pxelinux.cfg/default nfsroot=$serverip:/export$livedirectory
+	#~ fi
+	#~ sed -i 's/\(timeout.*\)/\1\nipappend 1/' /tftpboot/pxelinux.cfg/default
+	#~ sed -i s/^\#\ tftp/tftp/ /etc/inetd.conf
+	#~ . /etc/rc.d/rc.inetd start
+	
+	#~ #setup DHCP server
+	#~ rangeprefix=`echo $serverip | cut -f1-3 -d .` #(FIXME): only the last byte is used for network machine number
+	#~ rangebegin=`echo $iprange | cut -f1 -d-`
+	#~ rangeend=`echo $iprange | cut -f2 -d-`
+	#~ cat > /etc/dhcpd.conf << EOF
+#~ ddns-update-style none;
+#~ option routers $gateway;
+#~ option domain-name-servers $nameserver;
+
+#~ subnet $network netmask $netmask {
+	#~ range $rangeprefix.$rangebegin $rangeprefix.$rangeend;
+	#~ filename "pxelinux.0";
+	#~ next-server $serverip; #TFTP server
+#~ }
+#~ EOF
+	#~ rm -f /var/state/dhcp/dhcpd.leases; touch /var/state/dhcp/dhcpd.leases #Needed on live system
+	#~ dhcpd $listeniface
+#~ }
+
+
+#~ function unshare_live() {
+	#~ . /etc/rc.d/rc.nfsd stop
+	#~ . /etc/rc.d/rc.inetd stop
+	#~ killall dhcpd
+	#~ sed -i s/^tftp/\#\ tftp/ /etc/inetd.conf
+	#~ rm -rf /tftpboot
+	#~ #umount /export/home
+	#~ livedirectorybind=`mount | grep export | cut -f3 -d' '`
+	#~ if [ ! -z "livedirectorybind" ]; then umount $livedirectorybind; fi
+	#~ rm -rf /export
+	#~ if [ -f /etc/export.sl ]; then mv /etc/exports{.sl,}; fi
+	#~ if [ -f /etc/dhcpd.conf.sl ]; then mv /etc/dhcpd.conf{.sl,}; fi
+#~ }
+
+
 function define_sltitle() {
 	if [ -z "$SLTITLE" ]; then
 		SLTITLE="Slackware 13.1 Live"
 		echo "note: 'SLTITLE' unset, using: '$SLTITLE'"
-		echo "info: this is the live-CD/DVD label and the boot menu title"
+		echo -e "info: this is the live-CD/DVD label, the boot menu title and the GUI \n\tinstallation program title"
 		echo "to set: export SLTITLE=\"your custom title\""
 	else echo "SLTITLE='$SLTITLE'"
 	fi
@@ -402,7 +540,7 @@ function define_slmodlist() {
 	if [ -z "$SLMODLIST" ]; then
 		SLMODLIST="squashfs:fuse" #using stock Slackware huge' kernel
 		echo "note: 'SLMODLIST' unset, using: '$SLMODLIST'"
-		echo "info: should be set if you don't use Slackware 'huge' stock kernel"
+		echo "info: should be set if you don't use Slackware stock huge kernel"
 		echo "to set: export SLMODLIST=\"module1:module2:...\""
 		echo "example: export SLMODLIST=\"squashfs:fuse:loop:isofs:nls_utf8:ehci-hcd:uhci-hcd:ohci-hcd:usb-storage\""
 		#remarq: scsi and sata controlers drivers have to be included in kernel, or added here
@@ -412,7 +550,7 @@ function define_slmodlist() {
 }
 
 
-function print_usage() {
+function print_add_usage() {
 	echo "===== Building system from packages ====="
 	echo -e "usage: `basename $0` --add packages_dir system_root_dir pkg_list_file"
 	echo "example: `basename $0` --add /mnt/cdrom /mnt/system packages-list.txt"
@@ -425,17 +563,19 @@ slackware/n/iputils
 slackware/n/net-tools
 slackware/n/network-scripts
 postinstall=ln -sf ifconfig usr/bin/ifcfg
-postinstall=...
+postinstall=echo \"live.slackware.org\" > etc/HOSTNAME
 ----------------------------------------"
 	echo "remarqs:"
 	echo "- adding packages could also be done by a command like:"
 	echo -e "\tinstallpkg -root /mnt/system /mnt/cdrom/slackware/a/*.t?z"
 	echo -e "- packages slackware-live, unionfs-fuse and squashfs-tools are recommended on\nthe live system;"
 	echo "- think to create a user with the following command for exemple:"
-	echo -e "\tchroot /mnt/system useradd -m -G floppy,cdrom,netdev,plugdev,scanner,lp,audio,video,power -s /bin/bash liveuser"
+	echo -e "\tchroot /mnt/system useradd -m -g users -G floppy,cdrom,netdev,plugdev,scanner,lp,audio,video,power -s /bin/bash liveuser"
 	echo -e "\tsed -i 's/liveuser:.:/liveuser::/' /mnt/system/etc/shadow #no password"
 	echo ""
-	
+}
+
+function print_init_usage() {
 	echo "===== Setup kernel and initrd ====="
 	echo "usage: `basename $0` --init system_root_dir live_system_dir [-linomad|-nosli]"
 	echo -e "\t(the '-linomad' option enables LiNomad startup scripts)"
@@ -446,49 +586,82 @@ postinstall=...
 	echo "they have to be included in kernel or initrd (if they are available as modules);"
 	echo "see 'SLMODLIST' environment variable"
 	echo ""
-	
+}
+
+function print_guiprep_usage() {
 	echo "===== Prepare system GUI (fonts, icons ...) ====="
 	echo "usage: `basename $0` --guiprep root_dir_1(rw) root_dir_2(ro) ..."
 	echo -e "\t(list needed root directories to recompose a working system)"
 	echo "example: `basename $0` --guiprep /mnt/system-core /mnt/system-gui"
-	echo "remarq: only needed if the system is splitted into multiple directories"
+	echo "remarq: only needed if the system is divided into multiple directories"
 	echo ""
-	
+}
+
+function print_module_usage() {
 	echo "===== Create a SquashFS module for the system ====="
 	echo "usage: `basename $0` --module system_root_dir live_system_dir module_name [-optional]"
-	echo -e "\t('-optional': optional module)"
+	echo -e "\t(with the '-optional' option, the module is stored in the optional directory)"
 	echo "example: `basename $0` --module /mnt/system /tmp/live 0-slackware-live"
 	echo -e "remarq: you can put your own modules inside 'live_system_dir/boot/modules/' or\n'live_system_dir/boot/optional/', or move them between 'modules' and 'optional'"
 	echo ""
-	
+}
+
+function print_loadersetup_usage() {
+	echo "===== LiLo expert setup ====="
+	echo "usage: `basename $0` --loadersetup partition_device"
+	echo "example - after a system install:"
+	echo -e "\t`basename $0` --loadersetup /dev/sdx2"
+	echo ""
+}
+
+function print_install_usage() {
+	echo "===== Install live system ====="
+	echo "usage: `basename $0` --install system_root_dir partition_device [-auto|-expert]"
+	echo -e "\t(the '-auto' option enables LiLo installation into the MBR)"
+	echo -e "\t(with the '-expert' option LiLo is not installed - see expert setup)"
+	echo "example - from a running live system (typically):"
+	echo -e "\t`basename $0` --install /live/system /dev/sdx2 -auto"
+	echo "example - system cloning:"
+	echo -e "\t`basename $0` --install /mnt/system /dev/sdx2"
+	echo ""
+}
+
+function print_usb_usage() {
 	echo "===== Copy live system on USB device ====="
 	echo "usage: `basename $0` --usb live_system_dir device [-linomad]"
-	echo -e "\t(the '-linomad' option creates and enables the home dir stored on \n\tUSB key and GUI auto-detection for LiNomad)"
+	echo -e "\t(the '-linomad' option enables the home dir stored on USB key \n\tand GUI auto-detection for LiNomad startup scripts)"
 	echo "example - after initialization and module creation:"
 	echo -e "\t`basename $0` --usb /tmp/live /dev/sdx1"
 	echo "example - from a running live system:"
 	echo -e "\t`basename $0` --usb /live/livemedia /dev/sdx1"
 	echo ""
-	
+}
+
+function print_iso_usage() {
 	echo "===== Create a live CD/DVD ISO from live system ====="
 	echo "usage: `basename $0` --iso live_system_dir iso_file_name [-linomad]"
-	echo -e "\t(the '-linomad' option enables GUI auto-detection for LiNomad)"
+	echo -e "\t(the '-linomad' option enables GUI auto-detection for LiNomad startup scripts)"
 	echo "example - after initialization and module creation:"
 	echo -e "\t`basename $0` --iso /tmp/live /tmp/slackware-live.iso"
 	echo ""
-	
-	echo "===== Install the live system ====="
-	echo "usage: `basename $0` --install system_root_dir partition_device"
-	echo "example - from a running live system (typically):"
-	echo -e "\t`basename $0` --install /live/system /dev/sdx2"
-	echo "example - system cloning:"
-	echo -e "\t`basename $0` --install /mnt/system /dev/sdx2"
-	echo ""
-	
-	echo "===== Environment variables ====="
-	define_sltitle
-	define_slmodlist
 }
+
+function print_usage() {
+	print_add_usage
+	print_init_usage
+	print_guiprep_usage
+	print_module_usage
+	print_usb_usage
+	print_iso_usage
+	print_install_usage
+	print_loadersetup_usage
+}
+
+
+if (( `id -u` != 0 )); then
+	echo "Please run this script as 'root'."
+	exit 1
+fi
 
 
 action=$1
@@ -501,7 +674,8 @@ case $action in
 	then define_sltitle
 		define_slmodlist
 		init_live $rootdirectory $livedirectory $option
-	else print_usage
+	else print_init_usage
+		exit 2
 	fi
 	;;
 "--module")
@@ -511,7 +685,8 @@ case $action in
 	option=$5
 	if [ -d "$rootdirectory" ] && [ -d "$livedirectory" ] && [ ! -z "$modulename" ]
 	then add_module $rootdirectory $livedirectory $modulename $option
-	else print_usage
+	else print_module_usage
+		exit 2
 	fi
 	;;
 "--usb")
@@ -521,7 +696,8 @@ case $action in
 	if [ -d "$livedirectory" ] && [ -b "$installmedia" ]
 	then define_sltitle
 		install_usb $livedirectory $installmedia $option
-	else print_usage
+	else print_usb_usage
+		exit 2
 	fi
 	;;
 "--iso")
@@ -531,15 +707,26 @@ case $action in
 	if [ -d "$livedirectory" ] && [ -d "`dirname $imagefilename`" ] && [ ! -d "$imagefilename" ]
 	then define_sltitle
 		create_iso $livedirectory $imagefilename $option
-	else print_usage
+	else print_iso_usage
+		exit 2
 	fi
 	;;
 "--install")
 	rootdirectory=$2
 	systempart=$3
+	loadersetup=$4
 	if [ -d "$rootdirectory" ] && [ -b "$systempart" ]
-	then install_system $rootdirectory $systempart
-	else print_usage
+	then install_system $rootdirectory $systempart $loadersetup
+	else print_install_usage
+		exit 2
+	fi
+	;;
+"--loadersetup")
+	systempart=$2
+	if [ -b "$systempart" ]
+	then loadersetup $systempart
+	else print_loadersetup_usage
+		exit 2
 	fi
 	;;
 "--add")
@@ -548,7 +735,8 @@ case $action in
 	packageslistfile=$4
 	if [ -d "$packagesdirectory" ] && [ ! -z "$rootdirectory" ] && [ -f "$packageslistfile" ]
 	then add_packages $packagesdirectory $rootdirectory $packageslistfile
-	else print_usage
+	else print_add_usage
+		exit 2
 	fi
 	;;
 "--guiprep")
@@ -556,9 +744,28 @@ case $action in
 	if [ -d "$rwdirectory" ] 
 	then shift; shift 
 		gui_prep "$rwdirectory" $*
-	else print_usage
+	else print_guiprep_usage
+		exit 2
 	fi
 	;;
+#~ "--share")
+	#~ livedirectory=$2
+	#~ listeniface=$3
+	#~ iprange=$4
+	#~ option=$5
+	#~ if [ -d "$livedirectory" ] && ifconfig | grep -q "$listeniface " && [ ! -z "$iprange" ]
+	#~ then define_sltitle
+		#~ define_slmodlist
+		#~ unshare_live
+		#~ share_live $livedirectory $listeniface $iprange $option
+	#~ else print_share_usage
+		#~ exit 2
+	#~ fi
+	#~ ;;
+#~ "--unshare")
+	#~ unshare_live
+	#~ ;;
 *)	print_usage
+	exit 2
 	;;
 esac

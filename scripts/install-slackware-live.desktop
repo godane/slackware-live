@@ -5,6 +5,6 @@ Type=Application
 Name=Install SLTITLE
 Name[fr]=Installation de SLTITLE
 
-Categories=System
-Exec=install-slackware-live.sh
+Categories=Applications;System;
+Exec=ktsuss install-slackware-live.sh
 Icon=install-slackware-live

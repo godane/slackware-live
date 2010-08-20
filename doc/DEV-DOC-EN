@@ -1,0 +1,19 @@
+===== Live system files organisation during execution =====
+- The directory `/live/media' is the live media mount point (CD/DVD/USB);
+- the directory `/live/modules' contains the SquashFS modules mount points;
+- the directory `/live/system' is the union of the modules mount points (read-only);
+- the directory `/live/union' is the union of the directory `/live/changes' (write) and of the modules mount points;
+- the directory `/live/changes' contains the modifications done to the live system (copy on write);
+- the directories at root are mount points binded to the directories of `/live/union'.
+
+To add a SquashFS module while the live system is running, mount it in a subdirectory 
+of `/live/modules', then add it to the union `/live/union'; example:
+`mkdir /live/modules/module_name'
+`mount -o loop -t squashfs module_name /live/modules/module_name'
+`mount -o remount,add:1:/live/modules/module_name=ro /live/union'
+
+
+===== Conversion of a SquashFS module into a directory =====
+- Mount the module: `mount -o loop -t squashfs the_module mount_point';
+- copy files into an other directory: `cp -dpr mount_point destination_directory';
+- umount the module: `umount mount_point'.

@@ -1,8 +1,25 @@
-2010-07-20: Slackware-Live-0.2.8: '-add' option postinstall bugfix
-	+ fixed menu title
-	+ fixed non working AUFS mounting (thanks to Christopher Rogers for reporting)
+2010-08-17: Slackware-Live-0.2.11:
+	+ bugfix in install script (for InitRD creation)
+	+ installation improvements:
+		- now ask if the user wants automatic or expert LiLo setup
+		- use available InitRD
+	+ support ktsuss or gksu inside "*.desktop" files
+	+ online help improvement: only relevant the messages are now displayed
+2010-08-01: Slackware-Live-0.2.10: 
+	+ better USB home directory handling for LiNomad
+	+ better documentation
+	+ live system is now aware of mounts (squashfs, unionfs...)
+	+ installation program improvements:
+		- LiLo: use lilo.bmp only if available
+		- creates an initrd if needed
+2010-07-27: Slackware-Live-0.2.9: installation program bugfixes:
+	- LiLo: Windows partition detection (now searching for active ** NTFS ** partition)
+	- LiLo: copy all "sd*" block devices from live system to installed system
+	- remove boot media from available installation places	
+2010-07-20: Slackware-Live-0.2.8: fixed '-add' option postinstall
+	+ fixed boot menu title
+	+ fixed non working (for installation) AUFS mounting (thanks to Christopher Rogers for reporting)
 	+ fixed non working live system installation GUI menu entry for Linomad
-	+ fixed LiNomad USB home setup
 2010-07-17: Slackware-Live-0.2.7: copy2ram: copy only used modules (cf exclude and include boot parameters)
 	+ try to fix USB-CD/DVD booting
 	+ '--add' option bugfix

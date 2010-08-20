@@ -2,9 +2,12 @@ Slackware-Live requiert les utilitaires suivants (et leurs dépendances) pour fo
 - UnionFS-FUSE or AUFS (si le noyau utilisé le supporte),
 - SquashFS-Tools - support de la compression LZMA si le noyau et les outils la supportent,
 - SysLinux,
-- Xdialog (facultatif).
+- MkInitRD,
+- KTSUSS ou GKSU (facultatif, pour les fichiers `desktop' des programmes d'installation graphique),
+- Xdialog (facultatif, pour l'interface graphique d'insallation).
 
-Pour LiNomad: KTSUSS (facultatif), SALLU Storage-Detection (facultatif).
+LiNomad (facultatif) requière:
+- SALLU Storage-Detection (facultatif).
 
 Attention, Slackware-Live utilise le système de construction CMake.
 La procédure d'installation est donc la suivante:
@@ -15,6 +18,6 @@ La procédure d'installation est donc la suivante:
 	paquetage dans `/usr' au lieu de `/usr/local'),
 4) exécuter la commande `make',
 5) exécuter la commande `make install'
-	(ou `make install DESTDIR=chemin_absolu_vers_un_repertoire'
+	(ou `make install DESTDIR=/chemin/absolu/vers/destination'
 	pour placer les fichiers dans un emplacement temporaire au lieu de
 	celui attendu).

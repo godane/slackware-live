@@ -24,6 +24,16 @@ mkdir /slroot/live
 
 mkdir /slroot/live/media
 mediadetected=false
+#~ if [ ! -z "$nfsroot" ]; then
+	#~ mediadetected=true
+	#~ address=`echo $ip | cut -f1 -d:`
+	#~ netmask=`echo $ip | cut -f4 -d:`
+	#~ gateway=`echo $ip | cut -f3 -d:`
+	#~ ifconfig eth0 $address netmask $netmask
+	#~ #route add -n default gw $gateway
+	#~ #nfsroot=`echo $nfsroot | cut -f1 -d,`
+	#~ mount -o nolock -t nfs $nfsroot /slroot/live/media
+#~ fi
 detectedmediaiscd=false
 sleeptime=0
 while ! $mediadetected && [ "$sleeptime" != "10" ]; do #try each seconds, but don't wait (USB) more than 10 seconds
@@ -167,10 +177,10 @@ if [ -f /slackware-live/rc.linomad-boot ]; then #LiNomad startup
 	cp -f /slackware-live/inittab.linomad /slroot/etc/inittab
 	cp /slackware-live/autologin /slroot/usr/bin
 	chmod +x /slroot/usr/bin/autologin
-	sed -i 's/^Exec=.*/Exec=ktsuss \/usr\/sbin\/install-slackware-live.sh/' /slackware-live/install-slackware-live.desktop
 else #Slackware Live normal startup
 	touch /slroot/etc/fastboot
-	#~ echo "cat /proc/mounts /etc/mtab | sed 's/,relatime//' | sort -u > /etc/mtab" >> /slroot/etc/rc.d/rc.S #update /etc/mtab
+	echo "cat /proc/mounts | grep -v '^rootfs' > /etc/mtab" >> /slroot/etc/rc.d/rc.local #update /etc/mtab
+	chmod +x /slroot/etc/rc.d/rc.local
 	sed -i 's/\(\/rc.[06]\)/\1 fast/' /slroot/etc/inittab #to prevent system hang at shutdown
 	if $detectedmediaiscd && [ ! "$copy2ram" == "yes" ]; then #live-CD ejection (reboot, shutdown and poweroff commands are preloaded in cache)
 		sed -i 's/\(\/sbin\/reboot\)/reboot --help; shutdown --help; poweroff --help\n  eject \/dev\/$device\n  \1/' /slroot/etc/rc.d/rc.6
@@ -186,14 +196,26 @@ fi
 #system i18n setup
 if [ ! -z "$locale" ]; then
 	echo "Setting up locale ($locale)"
-	echo "export LANG=$locale" > /slroot/etc/profile.d/lang.sh
+	if [ -f /slroot/etc/profile.d/lang.sh ] && grep -q "^export LANG=" /slroot/etc/profile.d/lang.sh
+	then sed -i s/^export\ LANG=.*/export\ LANG=$locale/ /slroot/etc/profile.d/lang.sh
+	else echo "export LANG=$locale" >> /slroot/etc/profile.d/lang.sh
+	fi
 fi
 
 if [ ! -z "$keymap" ]; then
 	keymapfile="/`find /slroot/usr/share/kbd/keymaps -name $keymap.map.gz | cut -f3- -d/`"
 	if [ "$keymapfile" != "/" ]; then #if found
 		echo "Setting up keymap ($keymap)"
-		echo "/bin/loadkeys $keymapfile" > /slroot/etc/rc.d/rc.keymap
+		### <modified by Sebastian Reisse for ZenLive>
+		#~ echo "/usr/bin/loadkeys $keymapfile" > /slroot/etc/rc.d/rc.keymap
+		cat > /slroot/etc/rc.d/rc.keymap <<END
+#!/bin/sh
+# Load the keyboard map.  More maps are in /usr/share/kbd/keymaps.
+if [ -x /usr/bin/loadkeys ]; then
+  /usr/bin/loadkeys $keymap
+fi
+END
+		### </modified by Sebastian Reisse for ZenLive>
 		chmod +x /slroot/etc/rc.d/rc.keymap
 	fi
 	
@@ -218,14 +240,30 @@ fi
 cp -f /slackware-live/build-slackware-live.sh /slroot/usr/sbin/
 chmod +x /slroot/usr/sbin/build-slackware-live.sh
 if [ -d  /slroot/usr/share/applications ] && [ -f /slackware-live/install-slackware-live.desktop ]; then
-	echo "Enable live system install GUI"
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.desktop
 	cp /slackware-live/install-slackware-live.desktop /slroot/usr/share/applications/
 	sed -i "s/SLTITLE/$SLTITLE/" /slackware-live/install-slackware-live.sh
 	cp /slackware-live/install-slackware-live.sh /slroot/usr/sbin/
 	chmod +x /slroot/usr/sbin/install-slackware-live.sh
 	cp /slackware-live/install-slackware-live.png /slroot/usr/share/pixmaps/
+	if [ ! -f /slroot/usr/bin/ktsuss ]; then #add support for GKSU
+		if [ -f /slroot/usr/bin/gksu ]; then 
+			ln -sf gksu /slroot/usr/bin/ktsuss
+		fi
+	fi
 fi
+
+#~ #add optional modules load feature
+#~ if ! mount | grep -q "fuse.unionfs"; then #yet only available for AUFS
+	#~ cp -f /slackware-live/manage-optional-modules.sh /slroot/usr/sbin/
+	#~ chmod +x /slroot/usr/sbin/manage-optional-modules.sh
+	#~ if [ -d  /slroot/usr/share/applications ] && [ -f /slackware-live/load-optional-modules.desktop ]; then
+		#~ cp /slackware-live/load-optional-modules.desktop /slroot/usr/share/applications/
+		#~ cp /slackware-live/load-optional-modules.sh /slroot/usr/sbin/
+		#~ chmod +x /slroot/usr/sbin/load-optional-modules.sh
+		#~ cp /slackware-live/load-optional-modules.png /slroot/usr/share/pixmaps/
+	#~ fi
+#~ fi
 
 #chroot to live system
 umount /proc

@@ -5,11 +5,12 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 mount proc /proc -t proc
 mount sysfs /sys -t sysfs
 mount -w -o remount /
-cat > /etc/mtab << EOF
-none / tmpfs rw 0 0
-proc /proc proc rw 0 0
-sysfs /sys sysfs rw 0 0
-EOF
+#~ cat > /etc/mtab << EOF
+#~ none / tmpfs rw 0 0
+#~ proc /proc proc rw 0 0
+#~ sysfs /sys sysfs rw 0 0
+#~ EOF
+cat /proc/mounts | grep -v '^rootfs' > /etc/mtab
 
 #usbfs mounting
 mkdir -p /proc/bus/usb; mount usbfs /proc/bus/usb -t usbfs

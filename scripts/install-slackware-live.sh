@@ -17,6 +17,7 @@ case `echo $LANG | cut -c-2` in
 	MSGSYSINSTALL="Installation sur"
 	MSGLIVEINSTALL="Copie du système Vif sur"
 	MSGXDIALOGERRORNODESTINATION="Erreur: aucune destination disponible pour l'installation."
+	MSGXDIALOGAUTOLILOSETUP="Installer LiLo automatiquement dans le MBR ?"
 	;;
 *) MSGUNIT="KiB" 
 	MSGXDIALOGTITLE="SLTITLE installation"
@@ -24,6 +25,7 @@ case `echo $LANG | cut -c-2` in
 	MSGSYSINSTALL="Installation on"
 	MSGLIVEINSTALL="Live system copy on"
 	MSGXDIALOGERRORNODESTINATION="Error: no available destination for installation."
+	MSGXDIALOGAUTOLILOSETUP="Install LiLo automatically into the MBR ?"
 	;;
 esac
 
@@ -39,8 +41,9 @@ for partinfo in $listpart; do
 	fi
 done
 
+bootdevice=`cat /proc/mounts | grep /live/media | cut -c6-8` #sr0, sr1, sda, sbd...
 listliveinstallparts=""
-listpart=`fdisk -l | sed -n '/ 83 /p' | sed 's/[*+]//g' | sed 's/  */:/g' | cut -f1,4 -d':' `
+listpart=`fdisk -l | sed /$bootdevice/d | sed -n '/ 83 /p' | sed 's/[*+]//g' | sed 's/  */:/g' | cut -f1,4 -d':' `
 for partinfo in $listpart; do
 	partdev=`echo $partinfo | cut -f1 -d:`
 	partsize=`echo $partinfo | cut -f2 -d:`
@@ -51,13 +54,13 @@ for partinfo in $listpart; do
 done
 
 listliveinstalldisks=""
-for partdev in `ls -d /sys/block/sd?`; do
-	device=`basename $partdev`
-	partdev="/dev/$device"
-	partsize=`cat /sys/block/$device/size`
-	let partsize/=2
-	if [ $partsize != 0 ] && [ `cat /sys/block/$device/removable` == 1 ]
-	then listliveinstalldisks+="l$partdev '$MSGLIVEINSTALL $partdev ($partsize $MSGUNIT)' "
+for devname in `ls -d /sys/block/sd?`; do
+	device=`basename $devname`
+	devname="/dev/$device"
+	devsize=`cat /sys/block/$device/size`
+	let devsize/=2
+	if [ "$device" != "$bootdevice" ] && [ $devsize != 0 ] && [ `cat /sys/block/$device/removable` == 1 ]
+	then listliveinstalldisks+="l$devname '$MSGLIVEINSTALL $devname ($devsize $MSGUNIT)' "
 	fi
 done
 
@@ -74,7 +77,10 @@ installtype=`echo $installtypeandlocation | cut -c1`
 
 LOGFILE="/tmp/~Xhdinstall.sh$$"
 if [ "$installtype" == "s" ]
-then build-slackware-live.sh --install /live/system $location >> $LOGFILE 2>&1 & pid=$!
+then if $XDIALOG --stdout --title "$MSGXDIALOGTITLE" --yesno "$MSGXDIALOGAUTOLILOSETUP" 0 0
+	then build-slackware-live.sh --install /live/system $location -auto >> $LOGFILE 2>&1 & pid=$!
+	else build-slackware-live.sh --install /live/system $location -expert >> $LOGFILE 2>&1 & pid=$!
+	fi
 else build-slackware-live.sh --usb /live/media $location >> $LOGFILE 2>&1 & pid=$!
 fi
 $XDIALOG --title "$MSGXDIALOGTITLE" --no-ok --no-cancel --tailbox $LOGFILE 25 80

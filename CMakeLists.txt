@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.4)
 
 set (PROJECT_NAME "slackware-live")
 project (${PROJECT_NAME})
-set (PROJECT_VERSION "0.2.8")
+set (PROJECT_VERSION "0.2.11")
 
 add_subdirectory (scripts)
 add_subdirectory (linomad)
